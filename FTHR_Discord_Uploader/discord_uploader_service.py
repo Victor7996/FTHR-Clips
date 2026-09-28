@@ -23,8 +23,8 @@ TERMS_VERSION = '2026-09-28-v1'
 PRIVACY_VERSION = '2026-09-28-v1'
 
 _NETWORK_ACTIONS = {'upload', 'test_connection'}
-_MAX_CLIP_BYTES = 25 * 1024 * 1024  # 25 MB default Discord limit (50 MB / 500 MB for boosted servers)
-_MAX_BOOSTED_BYTES = 100 * 1024 * 1024
+_MAX_CLIP_BYTES = 10 * 1024 * 1024  # 10 MB default Discord limit (50 MB / 500 MB for boosted servers)
+_MAX_BOOSTED_BYTES = 500 * 1024 * 1024
 _BOUNDARY = b'----FTHRDiscordUploadBoundary' + hashlib.sha256(str(time.time()).encode()).hexdigest()[:16].encode()
 
 

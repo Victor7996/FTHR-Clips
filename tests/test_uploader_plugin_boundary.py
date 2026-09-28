@@ -273,21 +273,20 @@ def test_disabled_uploader_refuses_network_actions(tmp_path):
 
 def test_disabled_state_persists_across_manager_restart(tmp_path):
     settings = tmp_path / 'settings.json'
-    first = core_uploader.UploadManager(_CoreSettings())
-    with (
-            patch.object(core_uploader, '_SETTINGS_FILE', settings),
-            patch.object(first, 'is_plugin_installed', return_value=True)):
-        ok, message = first.set_plugin_enabled(True)
-        assert ok, message
-        assert json.loads(settings.read_text(encoding='utf-8'))['upload_enabled'] is True
+    with patch.object(core_uploader, '_SETTINGS_FILE', settings):
+        first = core_uploader.UploadManager(_CoreSettings())
+        with patch.object(first, 'is_plugin_installed', return_value=True):
+            ok, message = first.set_plugin_enabled(True)
+            assert ok, message
+            assert json.loads(settings.read_text(encoding='utf-8'))['upload_enabled'] is True
 
-        ok, message = first.set_plugin_enabled(False)
-        assert ok, message
-        assert json.loads(settings.read_text(encoding='utf-8'))['upload_enabled'] is False
+            ok, message = first.set_plugin_enabled(False)
+            assert ok, message
+            assert json.loads(settings.read_text(encoding='utf-8'))['upload_enabled'] is False
 
-        restarted = core_uploader.UploadManager(_CoreSettings())
-        assert restarted.get('upload_enabled') is False
-        assert not restarted.is_enabled()
+            restarted = core_uploader.UploadManager(_CoreSettings())
+            assert restarted.get('upload_enabled') is False
+            assert not restarted.is_enabled()
 
 
 def test_toggle_reports_save_failure_and_restores_previous_state():

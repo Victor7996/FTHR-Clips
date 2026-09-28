@@ -468,8 +468,8 @@ def provider_limit_mb(provider: str) -> int | None:
     return {
         'lustful': 100,
         'catbox': 200,
-        'discord': 25,
-        'discord_webhook': 25,
+        'discord': 10,
+        'discord_webhook': 10,
     }.get(str(provider or '').lower())
 
 
