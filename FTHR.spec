@@ -12,6 +12,7 @@ PLUGIN_DIR = ROOT / 'plugin-packages'
 OPTIONAL_PLUGIN_BUNDLES = [
     PLUGIN_DIR / 'FTHR-Uploader.fthrplugin',
     PLUGIN_DIR / 'FTHR-Hardware-Identity.fthrplugin',
+    PLUGIN_DIR / 'FTHR-Discord-Uploader.fthrplugin',
 ]
 
 

@@ -28,6 +28,8 @@ from core.upload_manager import (
     LUSTFUL_LEGAL_VERSION,
 )
 from core.uploader_bundle_manifest import (
+    DISCORD_PRIVACY_VERSION,
+    DISCORD_TERMS_VERSION,
     HARDWARE_POLICY_VERSION,
     UPLOADER_PRIVACY_VERSION,
     UPLOADER_TERMS_VERSION,
@@ -328,6 +330,7 @@ class UploadSettingsWidget(QWidget):
         self.provider_combo.addItem('Catbox', 'catbox')
         self.provider_combo.addItem('Lustful', 'lustful')
         self.provider_combo.addItem('Your server', _CUSTOM_PROVIDER)
+        self.provider_combo.addItem('Discord Webhook', 'discord_webhook')
         set_theme_style(self.provider_combo, combo_qss)
         self.provider_combo.currentIndexChanged.connect(self._on_provider_changed)
         provider_row.addWidget(self.provider_combo, 1)
@@ -373,6 +376,27 @@ class UploadSettingsWidget(QWidget):
         server_auth_row.addWidget(self.server_auth_edit, 1)
         custom_body.addLayout(server_auth_row)
         body.addWidget(self.custom_panel)
+
+        self.discord_panel = QFrame()
+        set_theme_style(self.discord_panel,
+            lambda: (f'background: {Colors.SURFACE_1}; border: 1px solid {Colors.BORDER}; '
+            f'border-left: 3px solid #5865F2;'))
+        discord_body = QVBoxLayout(self.discord_panel)
+        discord_body.setContentsMargins(16, 14, 16, 14)
+        discord_body.setSpacing(8)
+        discord_url_row = QHBoxLayout()
+        discord_url_row.setSpacing(10)
+        discord_url_row.addWidget(_field_label('Webhook URL'))
+        self.discord_url_edit = QLineEdit()
+        self.discord_url_edit.setPlaceholderText('https://discord.com/api/webhooks/...')
+        set_theme_style(self.discord_url_edit, lineedit_qss)
+        discord_url_row.addWidget(self.discord_url_edit, 1)
+        discord_body.addLayout(discord_url_row)
+        self.discord_hint = QLabel('Clips are uploaded directly to your Discord channel via this webhook.')
+        self.discord_hint.setWordWrap(True)
+        set_theme_style(self.discord_hint, lambda: (label_body(Colors.TEXT_MUTED, Fonts.SIZE_BODY)))
+        discord_body.addWidget(self.discord_hint)
+        body.addWidget(self.discord_panel)
 
         self.lustful_panel = QFrame()
         set_theme_style(self.lustful_panel,
@@ -497,6 +521,7 @@ class UploadSettingsWidget(QWidget):
         self.catbox_userhash.setText(self._sm.get('catbox_userhash', ''))
         self.server_url_edit.setText(self._sm.get('upload_server_url', ''))
         self.server_auth_edit.setText(self._sm.get('upload_auth_header', ''))
+        self.discord_url_edit.setText(self._sm.get('discord_webhook_url', ''))
         mode = self._sm.get('upload_mode', 'manual')
         self.mode_immediate.setChecked(mode == 'immediate')
         self.mode_interval.setChecked(mode == 'interval')
@@ -517,30 +542,66 @@ class UploadSettingsWidget(QWidget):
         if self._loading:
             self._body.setVisible(requested)
             return
-        if requested and not self._sm.is_plugin_installed():
-            try:
-                terms, privacy = self._sm.uploader_legal_text()
-            except Exception as exc:
-                self._reject_enable('Upload Extension Unavailable', str(exc))
-                return
-            accepted = _legal_install_dialog(
-                self,
-                title='Install FTHR Upload Extension',
-                explanation=(
-                    'This separately packaged component contains all provider network '
-                    'code. FTHR Clips Core remains upload-free.'),
-                terms=terms,
-                privacy=privacy,
-                install_label='ACCEPT & INSTALL UPLOADER',
-            )
-            if not accepted:
-                self._reject_enable('', '')
-                return
-            ok, message = self._sm.activate_plugin(
-                UPLOADER_TERMS_VERSION, UPLOADER_PRIVACY_VERSION)
-            if not ok:
-                self._reject_enable('Upload Extension Installation Failed', message)
-                return
+        provider = self.provider_combo.currentData() or 'catbox'
+        if requested:
+            if provider == 'discord_webhook':
+                if not self._sm.is_discord_plugin_installed():
+                    try:
+                        terms, privacy = self._sm.discord_legal_text()
+                    except Exception as exc:
+                        self._reject_enable('Discord Webhook Extension Unavailable', str(exc))
+                        return
+                    accepted = _legal_install_dialog(
+                        self,
+                        title='Install Discord Webhook Extension',
+                        explanation=(
+                            'This separately packaged component uploads clips directly to your Discord webhook. '
+                            'FTHR Clips Core remains network-free.'),
+                        terms=terms,
+                        privacy=privacy,
+                        install_label='ACCEPT & INSTALL DISCORD PLUGIN',
+                    )
+                    if not accepted:
+                        self._reject_enable('', '')
+                        return
+                    ok, message = self._sm.activate_discord_plugin(
+                        DISCORD_TERMS_VERSION, DISCORD_PRIVACY_VERSION)
+                    if not ok:
+                        self._reject_enable('Discord Extension Installation Failed', message)
+                        return
+            elif not self._sm.is_plugin_installed():
+                try:
+                    terms, privacy = self._sm.uploader_legal_text()
+                except Exception as exc:
+                    self._reject_enable('Upload Extension Unavailable', str(exc))
+                    return
+                accepted = _legal_install_dialog(
+                    self,
+                    title='Install FTHR Upload Extension',
+                    explanation=(
+                        'This separately packaged component contains all provider network '
+                        'code. FTHR Clips Core remains upload-free.'),
+                    terms=terms,
+                    privacy=privacy,
+                    install_label='ACCEPT & INSTALL UPLOADER',
+                )
+                if not accepted:
+                    self._reject_enable('', '')
+                    return
+                ok, message = self._sm.activate_plugin(
+                    UPLOADER_TERMS_VERSION, UPLOADER_PRIVACY_VERSION)
+                if not ok:
+                    self._reject_enable('Upload Extension Installation Failed', message)
+                    return
+            else:
+                ok, message = self._sm.set_plugin_enabled(requested)
+                if not ok:
+                    FthrMessageDialog.warning(self, 'Upload Extension', message)
+                    self.enable_check.blockSignals(True)
+                    self.enable_check.setChecked(not requested)
+                    self.enable_check.blockSignals(False)
+                    self._body.setVisible(not requested)
+                    return
         else:
             ok, message = self._sm.set_plugin_enabled(requested)
             if not ok:
@@ -568,6 +629,54 @@ class UploadSettingsWidget(QWidget):
     def _ensure_provider_ready(self, provider: str) -> bool:
         if provider == _CUSTOM_PROVIDER:
             return True
+        if provider == 'discord_webhook':
+            if not self._sm.is_discord_plugin_installed():
+                try:
+                    terms, privacy = self._sm.discord_legal_text()
+                except Exception as exc:
+                    FthrMessageDialog.warning(self, 'Discord Extension Unavailable', str(exc))
+                    return False
+                accepted = _legal_install_dialog(
+                    self,
+                    title='Install Discord Webhook Extension',
+                    explanation=(
+                        'This separately packaged component uploads clips directly to your Discord webhook. '
+                        'FTHR Clips Core remains network-free.'),
+                    terms=terms,
+                    privacy=privacy,
+                    install_label='ACCEPT & INSTALL DISCORD PLUGIN',
+                )
+                if not accepted:
+                    return False
+                ok, message = self._sm.activate_discord_plugin(
+                    DISCORD_TERMS_VERSION, DISCORD_PRIVACY_VERSION)
+                if not ok:
+                    FthrMessageDialog.warning(self, 'Discord Extension Installation Failed', message)
+                    return False
+            return True
+        if not self._sm.is_plugin_installed():
+            try:
+                terms, privacy = self._sm.uploader_legal_text()
+            except Exception as exc:
+                FthrMessageDialog.warning(self, 'Upload Extension Unavailable', str(exc))
+                return False
+            accepted = _legal_install_dialog(
+                self,
+                title='Install FTHR Upload Extension',
+                explanation=(
+                    'This separately packaged component contains all provider network '
+                    'code. FTHR Clips Core remains upload-free.'),
+                terms=terms,
+                privacy=privacy,
+                install_label='ACCEPT & INSTALL UPLOADER',
+            )
+            if not accepted:
+                return False
+            ok, message = self._sm.activate_plugin(
+                UPLOADER_TERMS_VERSION, UPLOADER_PRIVACY_VERSION)
+            if not ok:
+                FthrMessageDialog.warning(self, 'Upload Extension Installation Failed', message)
+                return False
         if not self._sm.provider_consent_current(provider):
             if not _provider_consent_dialog(self, provider):
                 return False
@@ -621,10 +730,12 @@ class UploadSettingsWidget(QWidget):
         catbox = provider == 'catbox'
         lustful = provider == 'lustful'
         custom = provider == _CUSTOM_PROVIDER
+        discord = provider == 'discord_webhook'
         self.catbox_panel.setVisible(catbox)
         self.lustful_panel.setVisible(lustful)
         self.custom_panel.setVisible(custom)
-        self.website_btn.setVisible(not custom)
+        self.discord_panel.setVisible(discord)
+        self.website_btn.setVisible(catbox or lustful)
         self.website_btn.setText('OPEN CATBOX' if catbox else 'OPEN LUSTFUL')
         self.catbox_donate_btn.setVisible(catbox)
         self.lustful_donate_btn.setVisible(lustful)
@@ -647,6 +758,7 @@ class UploadSettingsWidget(QWidget):
             return
         self._sm.set('upload_provider', provider)
         self._sm.set('catbox_userhash', self.catbox_userhash.text().strip())
+        self._sm.set('discord_webhook_url', self.discord_url_edit.text().strip())
         server_url = self.server_url_edit.text().strip()
         if server_url and not server_url.lower().startswith(('http://', 'https://')):
             server_url = f'https://{server_url}'
@@ -680,6 +792,10 @@ class UploadSettingsWidget(QWidget):
             self._test_status.setText('Enter a server URL first')
             set_theme_style(self._test_status, lambda: (label_body(Colors.ERROR, Fonts.SIZE_BODY)))
             return
+        if provider == 'discord_webhook' and not self.discord_url_edit.text().strip():
+            self._test_status.setText('Enter a Discord Webhook URL first')
+            set_theme_style(self._test_status, lambda: (label_body(Colors.ERROR, Fonts.SIZE_BODY)))
+            return
         self.test_btn.setEnabled(False)
         self._test_status.setText('Testing…')
 
@@ -690,6 +806,7 @@ class UploadSettingsWidget(QWidget):
                     'catbox_userhash': self.catbox_userhash.text().strip(),
                     'upload_server_url': self.server_url_edit.text().strip(),
                     'upload_auth_header': self.server_auth_edit.text().strip(),
+                    'discord_webhook_url': self.discord_url_edit.text().strip(),
                 })
             except Exception as exc:
                 ok, message = False, str(exc)

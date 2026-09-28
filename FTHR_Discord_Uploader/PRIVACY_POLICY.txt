@@ -1,0 +1,11 @@
+FTHR CLIPS DISCORD WEBHOOK EXTENSION - PRIVACY POLICY
+Last updated: 2026-09-28
+
+1. DATA COLLECTION
+The FTHR Clips Discord Webhook Extension does not collect, log, or track your personal information, IP addresses, hardware identifiers, or usage telemetry.
+
+2. DATA TRANSMISSION
+When you upload a clip or test a webhook connection, your content and request are sent directly from your computer to Discord's servers using HTTPS encryption. FTHR Community does not operate proxy servers, intermediary relays, or data logging for your Discord uploads.
+
+3. LOCAL STORAGE
+Discord Webhook URLs and upload history records are stored locally on your device in your FTHR Clips settings directory.

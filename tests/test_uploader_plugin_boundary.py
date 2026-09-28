@@ -16,8 +16,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'FTHR_UI'))
 sys.path.insert(0, str(ROOT / 'FTHR_Uploader'))
 sys.path.insert(0, str(ROOT / 'FTHR_Hardware_ID'))
+sys.path.insert(0, str(ROOT / 'FTHR_Discord_Uploader'))
 
 import core.upload_manager as core_uploader
+import discord_uploader_service
 import hardware_id_service
 import uploader_service
 
@@ -155,10 +157,13 @@ EXPECTED_UPLOADER_BUNDLE_SHA256 = 'old-windows'
 EXPECTED_UPLOADER_LINUX_BUNDLE_SHA256 = 'existing-linux'
 
 EXPECTED_HARDWARE_BUNDLE_SHA256 = 'old-hardware'
+
+EXPECTED_DISCORD_BUNDLE_SHA256 = 'old-discord'
 '''
     result = builder['bind_windows_bundle_hashes'](source, {
         'uploader': 'new-windows',
         'hardware-identity': 'new-hardware',
+        'discord-uploader': 'new-discord',
     })
 
     assert result == '''"""Generated release bindings."""
@@ -167,6 +172,8 @@ EXPECTED_UPLOADER_BUNDLE_SHA256 = 'new-windows'
 EXPECTED_UPLOADER_LINUX_BUNDLE_SHA256 = 'existing-linux'
 
 EXPECTED_HARDWARE_BUNDLE_SHA256 = 'new-hardware'
+
+EXPECTED_DISCORD_BUNDLE_SHA256 = 'new-discord'
 '''
 
 
@@ -357,9 +364,34 @@ def test_consent_ui_is_the_only_activation_callsite():
         if path.name == 'upload_manager.py':
             continue
         source = path.read_text(encoding='utf-8')
-        if '.activate_plugin(' in source or '.activate_hardware_identity(' in source:
+        if ('.activate_plugin(' in source
+                or '.activate_hardware_identity(' in source
+                or '.activate_discord_plugin(' in source):
             callsites.append(path.relative_to(ROOT).as_posix())
     assert callsites == ['FTHR_UI/ui/upload_settings_widget.py']
+
+
+def test_disabled_discord_uploader_refuses_network_actions(tmp_path):
+    settings = tmp_path / 'settings.json'
+    settings.write_text(json.dumps({'upload_enabled': False}), encoding='utf-8')
+    activation_id = 'test-activation'
+    receipt = tmp_path / 'activation.json'
+    receipt.write_text(json.dumps({
+        'plugin_id': discord_uploader_service.PLUGIN_ID,
+        'plugin_version': discord_uploader_service.PLUGIN_VERSION,
+        'terms_version': discord_uploader_service.TERMS_VERSION,
+        'privacy_version': discord_uploader_service.PRIVACY_VERSION,
+        'activation_id': activation_id,
+        'executable_sha256': _sha256(Path(sys.executable)),
+        'settings_file': str(settings),
+    }), encoding='utf-8')
+    request = {'action': 'upload', 'activation_id': activation_id}
+    try:
+        discord_uploader_service._validate_activation(receipt, request)
+    except PermissionError as exc:
+        assert 'disabled' in str(exc)
+    else:
+        raise AssertionError('disabled discord uploader accepted a network action')
 
 
 @pytest.fixture
@@ -368,15 +400,19 @@ def built_windows_plugins():
         pytest.skip('frozen optional packages contain Windows executables')
     packages = ROOT / 'plugin-packages'
     if not all((packages / name).is_file() for name in (
-            'FTHR-Uploader.fthrplugin', 'FTHR-Hardware-Identity.fthrplugin')):
+            'FTHR-Uploader.fthrplugin',
+            'FTHR-Hardware-Identity.fthrplugin',
+            'FTHR-Discord-Uploader.fthrplugin')):
         pytest.skip('build optional packages with tools/build_optional_uploaders.py first')
 
 
 def test_built_dormant_packages_match_core_release_bindings(built_windows_plugins):
     uploader = ROOT / 'plugin-packages' / 'FTHR-Uploader.fthrplugin'
     hardware = ROOT / 'plugin-packages' / 'FTHR-Hardware-Identity.fthrplugin'
+    discord = ROOT / 'plugin-packages' / 'FTHR-Discord-Uploader.fthrplugin'
     assert _sha256(uploader) == core_uploader.EXPECTED_UPLOADER_BUNDLE_SHA256
     assert _sha256(hardware) == core_uploader.EXPECTED_HARDWARE_BUNDLE_SHA256
+    assert _sha256(discord) == core_uploader.EXPECTED_DISCORD_BUNDLE_SHA256
     with zipfile.ZipFile(uploader) as archive:
         assert set(archive.namelist()) == {
             'manifest.json',
@@ -391,21 +427,33 @@ def test_built_dormant_packages_match_core_release_bindings(built_windows_plugin
             'PRIVACY_POLICY.txt',
             'payload/FTHR Hardware Identity.exe',
         }
+    with zipfile.ZipFile(discord) as archive:
+        assert set(archive.namelist()) == {
+            'manifest.json',
+            'TERMS_OF_SERVICE.txt',
+            'PRIVACY_POLICY.txt',
+            'payload/FTHR Discord Uploader.exe',
+        }
 
 
 def test_built_one_shot_packages_activate_and_run_locally(tmp_path, built_windows_plugins):
     uploader_root = tmp_path / 'uploader'
     hardware_root = tmp_path / 'hardware'
+    discord_root = tmp_path / 'discord'
     settings_file = tmp_path / 'settings.json'
     with (
             patch.object(core_uploader, '_UPLOADER_ROOT', uploader_root),
             patch.object(core_uploader, '_HARDWARE_ROOT', hardware_root),
+            patch.object(core_uploader, '_DISCORD_ROOT', discord_root),
             patch.object(
                 core_uploader, '_UPLOADER_ACTIVATION_FILE',
                 uploader_root / 'activation.json'),
             patch.object(
                 core_uploader, '_HARDWARE_ACTIVATION_FILE',
                 hardware_root / 'activation.json'),
+            patch.object(
+                core_uploader, '_DISCORD_ACTIVATION_FILE',
+                discord_root / 'activation.json'),
             patch.object(core_uploader, '_SETTINGS_FILE', settings_file),
             patch.object(core_uploader, '_HISTORY_FILE', tmp_path / 'history.json'),
             patch.object(
@@ -418,6 +466,14 @@ def test_built_one_shot_packages_activate_and_run_locally(tmp_path, built_window
         assert ok, message
         response = manager._invoke_plugin('account_status', timeout=30)
         assert response.get('ok'), response
+
+        ok, message = manager.activate_discord_plugin(
+            core_uploader.DISCORD_TERMS_VERSION,
+            core_uploader.DISCORD_PRIVACY_VERSION,
+        )
+        assert ok, message
+        discord_response = manager._invoke_discord_plugin('account_status', timeout=30)
+        assert discord_response.get('ok'), discord_response
 
         ok, message = manager.activate_hardware_identity(
             core_uploader.HARDWARE_POLICY_VERSION)
@@ -438,3 +494,4 @@ def test_built_one_shot_packages_activate_and_run_locally(tmp_path, built_window
         result = json.loads(completed.stdout.strip())
         assert result.get('ok'), result
         assert len(result.get('hardware_id', '')) == 36
+

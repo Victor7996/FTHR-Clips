@@ -35,6 +35,10 @@ UPLOADER_PRIVACY_VERSION = '2026-08-24-v1'
 HARDWARE_PLUGIN_ID = 'com.fthrclips.hardware-identity'
 HARDWARE_PLUGIN_VERSION = '1.0.0'
 HARDWARE_POLICY_VERSION = 'lustful-2026-07-27-hwid-v1'
+DISCORD_PLUGIN_ID = 'com.fthrclips.discord-uploader'
+DISCORD_PLUGIN_VERSION = '1.0.0'
+DISCORD_TERMS_VERSION = '2026-09-28-v1'
+DISCORD_PRIVACY_VERSION = '2026-09-28-v1'
 
 
 @dataclass(frozen=True)
@@ -72,6 +76,19 @@ PACKAGE_DEFINITIONS = (
         plugin_id=HARDWARE_PLUGIN_ID,
         plugin_version=HARDWARE_PLUGIN_VERSION,
         legal_versions={'policy_version': HARDWARE_POLICY_VERSION},
+    ),
+    Package(
+        name='discord-uploader',
+        source_dir=ROOT / 'FTHR_Discord_Uploader',
+        source_file=ROOT / 'FTHR_Discord_Uploader' / 'discord_uploader_service.py',
+        executable='FTHR Discord Uploader.exe',
+        bundle='FTHR-Discord-Uploader.fthrplugin',
+        plugin_id=DISCORD_PLUGIN_ID,
+        plugin_version=DISCORD_PLUGIN_VERSION,
+        legal_versions={
+            'terms_version': DISCORD_TERMS_VERSION,
+            'privacy_version': DISCORD_PRIVACY_VERSION,
+        },
     ),
 )
 
@@ -180,7 +197,8 @@ def bind_windows_bundle_hashes(existing: str, hashes: dict[str, str]) -> str:
     result = existing
     for name, key in (
             ('EXPECTED_UPLOADER_BUNDLE_SHA256', 'uploader'),
-            ('EXPECTED_HARDWARE_BUNDLE_SHA256', 'hardware-identity')):
+            ('EXPECTED_HARDWARE_BUNDLE_SHA256', 'hardware-identity'),
+            ('EXPECTED_DISCORD_BUNDLE_SHA256', 'discord-uploader')):
         replacement = f'{name} = {hashes[key]!r}'
         updated, count = re.subn(
             rf'^{re.escape(name)} = [^\r\n]*',

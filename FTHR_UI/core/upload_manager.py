@@ -38,6 +38,12 @@ from core.export_profiles import (
     provider_limit_mb,
 )
 from core.uploader_bundle_manifest import (
+    DISCORD_PLUGIN_ID,
+    DISCORD_PLUGIN_VERSION,
+    DISCORD_PRIVACY_VERSION,
+    DISCORD_TERMS_VERSION,
+    EXPECTED_DISCORD_BUNDLE_SHA256,
+    EXPECTED_DISCORD_LINUX_BUNDLE_SHA256,
     EXPECTED_HARDWARE_BUNDLE_SHA256,
     EXPECTED_UPLOADER_BUNDLE_SHA256,
     EXPECTED_UPLOADER_LINUX_BUNDLE_SHA256,
@@ -66,8 +72,10 @@ _LOCAL_APP_DATA = _platform_data_root()
 _PLUGIN_DATA_ROOT = _LOCAL_APP_DATA / 'FTHR Clips' / 'plugins'
 _UPLOADER_ROOT = _PLUGIN_DATA_ROOT / 'uploader'
 _HARDWARE_ROOT = _PLUGIN_DATA_ROOT / 'hardware-identity'
+_DISCORD_ROOT = _PLUGIN_DATA_ROOT / 'discord-uploader'
 _UPLOADER_ACTIVATION_FILE = _UPLOADER_ROOT / 'activation.json'
 _HARDWARE_ACTIVATION_FILE = _HARDWARE_ROOT / 'activation.json'
+_DISCORD_ACTIVATION_FILE = _DISCORD_ROOT / 'activation.json'
 
 _SETTINGS_FILE = Path.home() / '.fthr' / 'uploader' / 'settings.json'
 _HISTORY_FILE = Path.home() / '.fthr' / 'uploader' / 'upload_history.json'
@@ -99,6 +107,11 @@ _DEFAULT_SETTINGS: dict[str, Any] = {
     'lustful_legal_accepted_at': '',
     'lustful_hardware_policy_accepted_version': '',
     'lustful_hardware_policy_accepted_at': '',
+    'discord_webhook_url': '',
+    'discord_active_webhook': '',
+    'discord_webhooks': [],
+    'discord_terms_accepted_version': '',
+    'discord_privacy_accepted_version': '',
 }
 
 _LEGACY_UPLOAD_KEYS = (
@@ -155,6 +168,27 @@ def _hardware_spec() -> _BundleSpec:
         entrypoint='FTHR Hardware Identity.exe',
         install_root=_HARDWARE_ROOT,
         receipt_path=_HARDWARE_ACTIVATION_FILE,
+    )
+
+
+def _discord_spec() -> _BundleSpec:
+    if sys.platform == 'win32':
+        filename = 'FTHR-Discord-Uploader.fthrplugin'
+        entrypoint = 'FTHR Discord Uploader.exe'
+    else:
+        filename = 'FTHR-Discord-Uploader-linux.fthrplugin'
+        entrypoint = 'FTHR-Discord-Uploader'
+    return _BundleSpec(
+        label='FTHR Discord Webhook Extension',
+        filename=filename,
+        plugin_id=DISCORD_PLUGIN_ID,
+        plugin_version=DISCORD_PLUGIN_VERSION,
+        expected_sha256=(
+            EXPECTED_DISCORD_LINUX_BUNDLE_SHA256
+            if sys.platform != 'win32' else EXPECTED_DISCORD_BUNDLE_SHA256),
+        entrypoint=entrypoint,
+        install_root=_DISCORD_ROOT,
+        receipt_path=_DISCORD_ACTIVATION_FILE,
     )
 
 
@@ -319,6 +353,10 @@ class UploadManager(QObject):
         _, terms, privacy = self._inspect_bundle(_hardware_spec())
         return terms, privacy
 
+    def discord_legal_text(self) -> tuple[str, str]:
+        _, terms, privacy = self._inspect_bundle(_discord_spec())
+        return terms, privacy
+
     def _is_installed(self, spec: _BundleSpec) -> bool:
         try:
             receipt = _read_object(spec.receipt_path)
@@ -360,6 +398,18 @@ class UploadManager(QObject):
             return receipt.get('policy_version') == HARDWARE_POLICY_VERSION
         except (OSError, ValueError, TypeError):
             # A malformed capability receipt is never treated as current consent.
+            return False
+
+    def is_discord_plugin_installed(self) -> bool:
+        if not self._is_installed(_discord_spec()):
+            return False
+        try:
+            receipt = _read_object(_DISCORD_ACTIVATION_FILE)
+            return (
+                receipt.get('terms_version') == DISCORD_TERMS_VERSION
+                and receipt.get('privacy_version') == DISCORD_PRIVACY_VERSION
+            )
+        except (OSError, ValueError, TypeError):
             return False
 
     def _activate_bundle(
@@ -507,16 +557,56 @@ class UploadManager(QObject):
             return False, 'Hardware Identity was installed, but consent could not be saved.'
         return True, message
 
+    def activate_discord_plugin(
+            self,
+            accepted_terms_version: str,
+            accepted_privacy_version: str) -> tuple[bool, str]:
+        if (accepted_terms_version != DISCORD_TERMS_VERSION
+                or accepted_privacy_version != DISCORD_PRIVACY_VERSION):
+            return False, 'The Discord Webhook notice was not accepted.'
+        ok, message = self._activate_bundle(
+            _discord_spec(),
+            {
+                'terms_version': accepted_terms_version,
+                'privacy_version': accepted_privacy_version,
+            },
+        )
+        if not ok:
+            return False, message
+
+        now = datetime.now(timezone.utc).isoformat(timespec='seconds')
+        self._settings.update({
+            'upload_enabled': True,
+            'discord_terms_accepted_version': accepted_terms_version,
+            'discord_privacy_accepted_version': accepted_privacy_version,
+            'discord_accepted_at': now,
+        })
+        if not self.save_settings():
+            self._settings['upload_enabled'] = False
+            return False, 'Discord Webhook Extension was installed, but its settings could not be saved.'
+        self.plugin_state_changed.emit(True, True)
+        return True, message
+
     def set_plugin_enabled(self, enabled: bool) -> tuple[bool, str]:
-        if enabled and not self.is_plugin_installed():
-            return False, 'Accept the uploader terms and privacy policy before enabling it.'
+        provider = str(self.get('upload_provider', 'catbox')).lower()
+        if enabled:
+            if provider in {'discord', 'discord_webhook'}:
+                if not self.is_discord_plugin_installed():
+                    return False, 'Accept the Discord Webhook terms and privacy policy before enabling it.'
+            elif not self.is_plugin_installed():
+                return False, 'Accept the uploader terms and privacy policy before enabling it.'
         previous = bool(self._settings.get('upload_enabled', False))
         requested = bool(enabled)
         self._settings['upload_enabled'] = requested
         if not self.save_settings():
             self._settings['upload_enabled'] = previous
             return False, 'The uploader setting could not be saved. Please try again.'
-        self.plugin_state_changed.emit(self.is_plugin_installed(), requested)
+        is_installed = (
+            self.is_discord_plugin_installed()
+            if provider in {'discord', 'discord_webhook'}
+            else self.is_plugin_installed()
+        )
+        self.plugin_state_changed.emit(is_installed, requested)
         return True, 'Upload Extension enabled.' if enabled else 'Upload Extension disabled.'
 
     def record_provider_consent(self, provider: str, version: str) -> bool:
@@ -622,6 +712,42 @@ class UploadManager(QObject):
             return {'ok': False, 'message': 'Uploader returned an invalid response.'}
         return response
 
+    def _invoke_discord_plugin(
+            self,
+            action: str,
+            payload: dict[str, Any] | None = None,
+            timeout: int = 600) -> dict[str, Any]:
+        receipt = self._activation(_discord_spec())
+        request: dict[str, Any] = {
+            'action': action,
+            'activation_id': receipt['activation_id'],
+            **(payload or {}),
+        }
+        creation_flags = (
+            getattr(subprocess, 'CREATE_NO_WINDOW', 0) if sys.platform == 'win32' else 0)
+        completed = subprocess.run(
+            [str(receipt['executable']), '--activation-receipt',
+             str(_DISCORD_ACTIVATION_FILE)],
+            input=json.dumps(request),
+            text=True,
+            capture_output=True,
+            timeout=timeout,
+            check=False,
+            creationflags=creation_flags,
+        )
+        lines = [line for line in completed.stdout.splitlines() if line.strip()]
+        if not lines:
+            detail = completed.stderr.strip() or (
+                f'Discord Uploader exited with code {completed.returncode}')
+            return {'ok': False, 'message': detail}
+        try:
+            response = json.loads(lines[-1])
+        except ValueError:
+            return {'ok': False, 'message': 'Discord Uploader returned an invalid response.'}
+        if not isinstance(response, dict):
+            return {'ok': False, 'message': 'Discord Uploader returned an invalid response.'}
+        return response
+
     # Lifecycle and queue
 
     def start(self) -> None:
@@ -663,6 +789,9 @@ class UploadManager(QObject):
         self._interval_timer.start(int(milliseconds))
 
     def is_enabled(self) -> bool:
+        provider = str(self.get('upload_provider', 'catbox')).lower()
+        if provider in {'discord', 'discord_webhook'}:
+            return bool(self.get('upload_enabled', False) and self.is_discord_plugin_installed())
         return bool(self.get('upload_enabled', False) and self.is_plugin_installed())
 
     def notify_clip_saved(
@@ -870,15 +999,27 @@ class UploadManager(QObject):
             return False, 'File no longer exists (deleted before upload)'
         if not self.is_enabled():
             return False, 'Upload Extension is disabled or not installed'
+        provider = str(self.get('upload_provider', 'catbox')).lower()
         try:
-            response = self._invoke_plugin(
-                'upload',
-                {
-                    'path': path,
-                    'allowed_roots': self._approved_roots(),
-                    'clips_root': str(self.clips_directory()),
-                },
-            )
+            if provider in {'discord', 'discord_webhook'}:
+                response = self._invoke_discord_plugin(
+                    'upload',
+                    {
+                        'path': path,
+                        'allowed_roots': self._approved_roots(),
+                        'clips_root': str(self.clips_directory()),
+                        'history_file': str(_HISTORY_FILE),
+                    },
+                )
+            else:
+                response = self._invoke_plugin(
+                    'upload',
+                    {
+                        'path': path,
+                        'allowed_roots': self._approved_roots(),
+                        'clips_root': str(self.clips_directory()),
+                    },
+                )
         except Exception as exc:
             response = {'ok': False, 'message': str(exc)}
         self._invalidate_history()
@@ -998,6 +1139,13 @@ class UploadManager(QObject):
         return bool(response.get('ok')), str(response.get('message', ''))
 
     def test_connection(self, config: dict[str, Any]) -> tuple[bool, str]:
+        provider = str(config.get('upload_provider') or self.get('upload_provider', 'catbox')).lower()
+        if provider in {'discord', 'discord_webhook'}:
+            if not self.is_discord_plugin_installed():
+                return False, 'Discord Webhook Extension is not installed.'
+            response = self._invoke_discord_plugin(
+                'test_connection', {'config': config}, timeout=30)
+            return bool(response.get('ok')), str(response.get('message', ''))
         response = self._invoke_plugin(
             'test_connection', {'config': config}, timeout=30)
         return bool(response.get('ok')), str(response.get('message', ''))
