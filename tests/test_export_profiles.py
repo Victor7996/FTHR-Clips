@@ -98,3 +98,6 @@ def test_custom_presets_round_trip_and_can_be_deleted(tmp_path: Path) -> None:
 def test_provider_limits_are_explicit() -> None:
     assert provider_limit_mb('lustful') == 100
     assert provider_limit_mb('catbox') == 200
+    assert provider_limit_mb('discord') == 25
+    assert provider_limit_mb('discord_webhook') == 25
+

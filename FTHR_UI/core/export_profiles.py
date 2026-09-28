@@ -465,7 +465,12 @@ def compress_media(source_path: str | Path, output_path: str | Path,
 
 
 def provider_limit_mb(provider: str) -> int | None:
-    return {'lustful': 100, 'catbox': 200}.get(str(provider or '').lower())
+    return {
+        'lustful': 100,
+        'catbox': 200,
+        'discord': 25,
+        'discord_webhook': 25,
+    }.get(str(provider or '').lower())
 
 
 def provider_compression_preset(provider: str) -> ExportPreset:
