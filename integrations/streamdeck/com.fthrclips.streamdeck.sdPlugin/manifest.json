@@ -5,11 +5,21 @@
   "Icon": "assets/icon",
   "URL": "https://github.com/FTHR-Community/FTHR-Clips",
   "Version": "1.0.0",
+  "OS": [
+    {
+      "Platform": "windows",
+      "MinimumVersion": "10"
+    },
+    {
+      "Platform": "mac",
+      "MinimumVersion": "10.14"
+    }
+  ],
   "SDKVersion": 2,
   "Software": {
     "MinimumVersion": "6.0"
   },
-  "CodePath": "bin/plugin.js",
+  "CodePath": "index.html",
   "Category": "FTHR Clips",
   "CategoryIcon": "assets/icon",
   "Actions": [

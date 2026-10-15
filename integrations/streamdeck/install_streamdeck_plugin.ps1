@@ -23,7 +23,10 @@ if (-not (Test-Path $parentDir)) {
     New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
 }
 
-# Copy plugin files
+# Copy plugin files cleanly (avoid nested folder bug in PowerShell)
+if (Test-Path $targetDir) {
+    Remove-Item -Path $targetDir -Recurse -Force
+}
 Copy-Item -Path $source -Destination $targetDir -Recurse -Force
 Write-Host "Plugin copied successfully to $targetDir" -ForegroundColor Green
 

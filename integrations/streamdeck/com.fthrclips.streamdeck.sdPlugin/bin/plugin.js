@@ -1,28 +1,15 @@
 /**
  * FTHR Clips - Elgato Stream Deck Official Integration Plugin
  * 
- * Communicates with FTHR-Clips Local API on ws://127.0.0.1:19840/api/v1/ws.
- * Zero external npm dependencies (uses standard Node.js runtime provided by Stream Deck).
+ * Runs in Stream Deck's internal runtime via index.html (or standalone Node.js).
+ * Communicates with FTHR Clips Local API on ws://127.0.0.1:19840/api/v1/ws.
  */
 
-const http = require('http');
-
-// Parse Stream Deck CLI arguments
+// Connection parameters
 let streamDeckPort = null;
 let pluginUUID = null;
 let registerEvent = null;
-
-const args = process.argv.slice(2);
-for (let i = 0; i < args.length; i++) {
-    if (args[i] === '-port') streamDeckPort = args[++i];
-    else if (args[i] === '-pluginUUID') pluginUUID = args[++i];
-    else if (args[i] === '-registerEvent') registerEvent = args[++i];
-}
-
-if (!streamDeckPort || !pluginUUID || !registerEvent) {
-    console.error('[FTHR StreamDeck] Missing required CLI arguments from Stream Deck');
-    process.exit(1);
-}
+let streamDeckWs = null;
 
 // Track active visible action contexts
 const activeActions = {
@@ -32,10 +19,7 @@ const activeActions = {
     status: new Set()
 };
 
-// Stream Deck WebSocket Connection
-let streamDeckWs = null;
-
-// FTHR-Clips State & Connection
+// FTHR Clips state
 let fthrWs = null;
 let fthrConnected = false;
 let fthrState = {
@@ -46,31 +30,66 @@ let fthrState = {
     state: 'idle'
 };
 
+/**
+ * Standard Stream Deck connection entrypoint called by Stream Deck software
+ */
+function connectElgatoStreamDeckSocket(port, uuid, eventType, appInfoString, actionInfoString) {
+    streamDeckPort = port;
+    pluginUUID = uuid;
+    registerEvent = eventType;
+    connectToStreamDeck();
+    connectToFTHR();
+}
+
+// Attach to window if in browser/webview environment
+if (typeof window !== 'undefined') {
+    window.connectElgatoStreamDeckSocket = connectElgatoStreamDeckSocket;
+}
+
+// Fallback for CLI/Node environment if executed standalone
+if (typeof process !== 'undefined' && process.argv && process.argv.length > 2) {
+    const args = process.argv.slice(2);
+    for (let i = 0; i < args.length; i++) {
+        if (args[i] === '-port') streamDeckPort = args[++i];
+        else if (args[i] === '-pluginUUID') pluginUUID = args[++i];
+        else if (args[i] === '-registerEvent') registerEvent = args[++i];
+    }
+    if (streamDeckPort && pluginUUID && registerEvent) {
+        connectToStreamDeck();
+        connectToFTHR();
+    }
+}
+
 function connectToStreamDeck() {
-    const WebSocket = global.WebSocket || require('ws');
-    streamDeckWs = new WebSocket(`ws://127.0.0.1:${streamDeckPort}`);
+    if (!streamDeckPort) return;
+    const WSClass = (typeof WebSocket !== 'undefined') ? WebSocket : (typeof global !== 'undefined' && global.WebSocket ? global.WebSocket : require('ws'));
+    try {
+        streamDeckWs = new WSClass(`ws://127.0.0.1:${streamDeckPort}`);
 
-    streamDeckWs.onopen = () => {
-        console.log('[FTHR StreamDeck] Connected to Stream Deck software');
-        streamDeckWs.send(JSON.stringify({
-            event: registerEvent,
-            uuid: pluginUUID
-        }));
-    };
+        streamDeckWs.onopen = () => {
+            console.log('[FTHR StreamDeck] Connected to Stream Deck software');
+            streamDeckWs.send(JSON.stringify({
+                event: registerEvent,
+                uuid: pluginUUID
+            }));
+            syncAllActions();
+        };
 
-    streamDeckWs.onmessage = (event) => {
-        try {
-            const msg = JSON.parse(event.data);
-            handleStreamDeckMessage(msg);
-        } catch (err) {
-            console.error('[FTHR StreamDeck] Failed parsing SD message:', err);
-        }
-    };
+        streamDeckWs.onmessage = (event) => {
+            try {
+                const msg = JSON.parse(event.data);
+                handleStreamDeckMessage(msg);
+            } catch (err) {
+                console.error('[FTHR StreamDeck] Failed parsing SD message:', err);
+            }
+        };
 
-    streamDeckWs.onclose = () => {
-        console.log('[FTHR StreamDeck] Stream Deck connection closed');
-        process.exit(0);
-    };
+        streamDeckWs.onclose = () => {
+            console.log('[FTHR StreamDeck] Stream Deck connection closed');
+        };
+    } catch (e) {
+        console.error('[FTHR StreamDeck] Stream Deck connect error:', e);
+    }
 }
 
 function handleStreamDeckMessage(msg) {
@@ -79,16 +98,16 @@ function handleStreamDeckMessage(msg) {
     const context = msg.context;
 
     if (event === 'willAppear') {
-        if (action.endsWith('.clip')) activeActions.clip.add(context);
-        else if (action.endsWith('.record')) activeActions.record.add(context);
-        else if (action.endsWith('.screenshot')) activeActions.screenshot.add(context);
-        else if (action.endsWith('.status')) activeActions.status.add(context);
+        if (action && action.endsWith('.clip')) activeActions.clip.add(context);
+        else if (action && action.endsWith('.record')) activeActions.record.add(context);
+        else if (action && action.endsWith('.screenshot')) activeActions.screenshot.add(context);
+        else if (action && action.endsWith('.status')) activeActions.status.add(context);
         syncActionUI(context, action);
     } else if (event === 'willDisappear') {
-        if (action.endsWith('.clip')) activeActions.clip.delete(context);
-        else if (action.endsWith('.record')) activeActions.record.delete(context);
-        else if (action.endsWith('.screenshot')) activeActions.screenshot.delete(context);
-        else if (action.endsWith('.status')) activeActions.status.delete(context);
+        if (action && action.endsWith('.clip')) activeActions.clip.delete(context);
+        else if (action && action.endsWith('.record')) activeActions.record.delete(context);
+        else if (action && action.endsWith('.screenshot')) activeActions.screenshot.delete(context);
+        else if (action && action.endsWith('.status')) activeActions.status.delete(context);
     } else if (event === 'keyDown') {
         handleButtonPress(action, context);
     }
@@ -100,7 +119,7 @@ function handleButtonPress(action, context) {
             event: 'showAlert',
             context: context
         });
-        sendPostAction('/api/v1/status', {}); // Ping HTTP fallback
+        sendPostAction('/api/v1/status', {});
         return;
     }
 
@@ -124,7 +143,6 @@ function handleButtonPress(action, context) {
     }
 }
 
-// Stream Deck Helper
 function sendToStreamDeck(payload) {
     if (streamDeckWs && streamDeckWs.readyState === 1) {
         streamDeckWs.send(JSON.stringify(payload));
@@ -201,14 +219,13 @@ function syncActionUI(context, action) {
     }
 }
 
-// FTHR-Clips WebSocket Client
 function connectToFTHR() {
-    const WebSocket = global.WebSocket || require('ws');
+    const WSClass = (typeof WebSocket !== 'undefined') ? WebSocket : (typeof global !== 'undefined' && global.WebSocket ? global.WebSocket : require('ws'));
     try {
-        fthrWs = new WebSocket('ws://127.0.0.1:19840/api/v1/ws');
+        fthrWs = new WSClass('ws://127.0.0.1:19840/api/v1/ws');
 
         fthrWs.onopen = () => {
-            console.log('[FTHR StreamDeck] Connected to FTHR-Clips Local API');
+            console.log('[FTHR StreamDeck] Connected to FTHR Clips Local API');
             fthrConnected = true;
             syncAllActions();
         };
@@ -223,16 +240,16 @@ function connectToFTHR() {
         };
 
         fthrWs.onerror = () => {
-            fthrWs.close();
+            if (fthrWs && fthrWs.close) fthrWs.close();
         };
 
         fthrWs.onclose = () => {
             if (fthrConnected) {
-                console.log('[FTHR StreamDeck] Disconnected from FTHR-Clips');
+                console.log('[FTHR StreamDeck] Disconnected from FTHR Clips');
             }
             fthrConnected = false;
             syncAllActions();
-            setTimeout(connectToFTHR, 2000); // Auto-reconnect every 2 seconds
+            setTimeout(connectToFTHR, 2000);
         };
     } catch (e) {
         fthrConnected = false;
@@ -298,30 +315,35 @@ function sendFthrCommand(actionName) {
     if (fthrWs && fthrWs.readyState === 1) {
         fthrWs.send(JSON.stringify({ action: actionName }));
     } else {
-        // HTTP REST fallback
         sendPostAction(`/api/v1/actions/${actionName === 'save_clip' ? 'save_clip' : 'record/toggle'}`, {});
     }
 }
 
 function sendPostAction(endpoint, body) {
-    const postData = JSON.stringify(body);
-    const options = {
-        hostname: '127.0.0.1',
-        port: 19840,
-        path: endpoint,
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(postData),
-            'Host': '127.0.0.1:19840'
-        }
-    };
-    const req = http.request(options, (res) => {});
-    req.on('error', () => {});
-    req.write(postData);
-    req.end();
+    if (typeof fetch !== 'undefined') {
+        fetch(`http://127.0.0.1:19840${endpoint}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body || {})
+        }).catch(() => {});
+        return;
+    }
+    try {
+        const http = require('http');
+        const postData = JSON.stringify(body || {});
+        const req = http.request({
+            hostname: '127.0.0.1',
+            port: 19840,
+            path: endpoint,
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(postData),
+                'Host': '127.0.0.1:19840'
+            }
+        }, () => {});
+        req.on('error', () => {});
+        req.write(postData);
+        req.end();
+    } catch (_) {}
 }
-
-// Start Stream Deck Client and FTHR-Clips Client
-connectToStreamDeck();
-connectToFTHR();
