@@ -149,6 +149,15 @@ function sendToStreamDeck(payload) {
     }
 }
 
+function formatDurationLabel(seconds) {
+    if (!seconds || seconds <= 0) return '30s';
+    if (seconds < 60) return `${seconds}s`;
+    if (seconds % 60 === 0) return `${seconds / 60}m`;
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}m${s}s`;
+}
+
 function syncAllActions() {
     activeActions.clip.forEach(ctx => syncActionUI(ctx, 'com.fthrclips.streamdeck.clip'));
     activeActions.record.forEach(ctx => syncActionUI(ctx, 'com.fthrclips.streamdeck.record'));
@@ -156,6 +165,8 @@ function syncAllActions() {
 }
 
 function syncActionUI(context, action) {
+    if (!context || !action) return;
+
     if (!fthrConnected) {
         if (action.endsWith('.record')) {
             sendToStreamDeck({
@@ -167,6 +178,13 @@ function syncActionUI(context, action) {
                 event: 'setTitle',
                 context: context,
                 payload: { title: 'FTHR\nOFFLINE', target: 0 }
+            });
+        } else if (action.endsWith('.clip')) {
+            const sec = fthrState.clip_buffer_seconds || 30;
+            sendToStreamDeck({
+                event: 'setTitle',
+                context: context,
+                payload: { title: `CLIP\n${formatDurationLabel(sec)}`, target: 0 }
             });
         } else if (action.endsWith('.status')) {
             sendToStreamDeck({
@@ -207,7 +225,7 @@ function syncActionUI(context, action) {
         sendToStreamDeck({
             event: 'setTitle',
             context: context,
-            payload: { title: `CLIP\n${sec}s`, target: 0 }
+            payload: { title: `CLIP\n${formatDurationLabel(sec)}`, target: 0 }
         });
     } else if (action.endsWith('.status')) {
         const title = fthrState.active_game ? fthrState.active_game.slice(0, 10) : 'CAPTURE\nREADY';
@@ -297,7 +315,9 @@ function handleFthrEvent(msg) {
                 payload: { title: 'SAVED!', target: 0 }
             });
         });
-        setTimeout(() => syncActionUI(null, 'com.fthrclips.streamdeck.clip'), 2000);
+        setTimeout(() => {
+            activeActions.clip.forEach(ctx => syncActionUI(ctx, 'com.fthrclips.streamdeck.clip'));
+        }, 2000);
     } else if (event === 'clip_save_failed') {
         activeActions.clip.forEach(ctx => {
             sendToStreamDeck({ event: 'showAlert', context: ctx });
@@ -307,7 +327,9 @@ function handleFthrEvent(msg) {
                 payload: { title: 'FAILED', target: 0 }
             });
         });
-        setTimeout(() => syncActionUI(null, 'com.fthrclips.streamdeck.clip'), 2500);
+        setTimeout(() => {
+            activeActions.clip.forEach(ctx => syncActionUI(ctx, 'com.fthrclips.streamdeck.clip'));
+        }, 2500);
     }
 }
 

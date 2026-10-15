@@ -39,10 +39,10 @@
       "States": [
         {
           "Image": "assets/clip",
-          "Title": "CLIP",
+          "Title": "CLIP\n30s",
           "TitleColor": "#ffffff",
           "TitleAlignment": "bottom",
-          "FontSize": 11
+          "FontSize": 10
         }
       ]
     },

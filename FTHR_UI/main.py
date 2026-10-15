@@ -3210,6 +3210,10 @@ class MainWindow(QMainWindow):
 
         self.clip_duration = _validated_setting(
             'clip_length', 30, validate_normal_clip_length)
+        if hasattr(self, 'remote_api') and self.remote_api is not None:
+            self.remote_api.update_state({
+                'clip_buffer_seconds': int(self.clip_duration),
+            })
         self.capture_fps = _validated_setting(
             'framerate', 60, validate_fps)
 
@@ -4853,6 +4857,10 @@ class MainWindow(QMainWindow):
         self.clip_duration  = duration
         self.buffer_seconds = compute_buffer_seconds(
             duration)
+        if hasattr(self, 'remote_api') and self.remote_api is not None:
+            self.remote_api.update_state({
+                'clip_buffer_seconds': int(duration),
+            })
 
 
     def _on_framerate_changed(self, fps: int):        self.capture_fps = fps
