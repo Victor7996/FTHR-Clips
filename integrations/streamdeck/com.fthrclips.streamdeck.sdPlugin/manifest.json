@@ -1,0 +1,84 @@
+{
+  "Author": "Victor7996 & FTHR Community",
+  "Description": "Control FTHR Clips, save instant replay clips, toggle manual recording with live timers, and monitor capture status directly on your Stream Deck.",
+  "Name": "FTHR Clips",
+  "Icon": "assets/icon",
+  "URL": "https://github.com/FTHR-Community/FTHR-Clips",
+  "Version": "1.0.0",
+  "SDKVersion": 2,
+  "Software": {
+    "MinimumVersion": "6.0"
+  },
+  "CodePath": "bin/plugin.js",
+  "Category": "FTHR Clips",
+  "CategoryIcon": "assets/icon",
+  "Actions": [
+    {
+      "Icon": "assets/clip",
+      "Name": "Save Clip",
+      "Tooltip": "Save the current replay buffer clip",
+      "UUID": "com.fthrclips.streamdeck.clip",
+      "States": [
+        {
+          "Image": "assets/clip",
+          "Title": "CLIP",
+          "TitleColor": "#ffffff",
+          "TitleAlignment": "bottom",
+          "FontSize": "11"
+        }
+      ]
+    },
+    {
+      "Icon": "assets/record_idle",
+      "Name": "Toggle Recording",
+      "Tooltip": "Start or stop manual recording with live elapsed timer",
+      "UUID": "com.fthrclips.streamdeck.record",
+      "States": [
+        {
+          "Image": "assets/record_idle",
+          "Title": "RECORD",
+          "TitleColor": "#a0a0a0",
+          "TitleAlignment": "bottom",
+          "FontSize": "10"
+        },
+        {
+          "Image": "assets/record_active",
+          "Title": "REC\n00:00",
+          "TitleColor": "#ff4444",
+          "TitleAlignment": "bottom",
+          "FontSize": "10"
+        }
+      ]
+    },
+    {
+      "Icon": "assets/screenshot",
+      "Name": "Screenshot",
+      "Tooltip": "Take and save a screenshot of the current game or desktop",
+      "UUID": "com.fthrclips.streamdeck.screenshot",
+      "States": [
+        {
+          "Image": "assets/screenshot",
+          "Title": "SCREENSHOT",
+          "TitleColor": "#ffffff",
+          "TitleAlignment": "bottom",
+          "FontSize": "9"
+        }
+      ]
+    },
+    {
+      "Icon": "assets/status",
+      "Name": "Engine Status",
+      "Tooltip": "Displays active game, capture health, and buffer length",
+      "UUID": "com.fthrclips.streamdeck.status",
+      "States": [
+        {
+          "Image": "assets/status",
+          "Title": "OFFLINE",
+          "TitleColor": "#888888",
+          "TitleAlignment": "bottom",
+          "FontSize": "9"
+        }
+      ]
+    }
+  ]
+}

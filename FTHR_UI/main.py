@@ -3173,6 +3173,21 @@ class MainWindow(QMainWindow):
         # refresh_settings() without needing a direct signal connection.
         self.settings_manager._upload_manager_ref = self.upload_manager
 
+        from core.remote_api import RemoteApiController
+        self.remote_api = RemoteApiController(
+            host=str(self.settings_manager.get('remote_api_host', '127.0.0.1')),
+            port=int(self.settings_manager.get('remote_api_port', 19840)),
+            parent=self,
+        )
+        self.remote_api.request_save_clip.connect(self._on_remote_api_save_clip)
+        self.remote_api.request_toggle_recording.connect(self._toggle_manual_recording)
+        self.remote_api.request_start_recording.connect(self._on_hotkey_start_recording)
+        self.remote_api.request_stop_recording.connect(self._on_hotkey_stop_recording)
+        self.remote_api.request_screenshot.connect(self._on_hotkey_save_screenshot)
+
+        if bool(self.settings_manager.get('remote_api_enabled', True)):
+            self.remote_api.start()
+
         # Load custom theme colors before any UI is built so QSS uses them
         self._theme_mgr = ThemeManager()
         _theme_colors = self._theme_mgr.get_all_colors()
@@ -4252,6 +4267,12 @@ class MainWindow(QMainWindow):
     def _on_hotkey_save_clip(self):
         config = self._capture_config.active
         self._save_clip(config.normal_clip_seconds if config else self.clip_duration)
+
+    def _on_remote_api_save_clip(self, duration: int = 0):
+        if duration > 0:
+            self._save_clip(duration)
+        else:
+            self._on_hotkey_save_clip()
 
 
     def _on_hotkey_start_recording(self):
@@ -5787,8 +5808,11 @@ class MainWindow(QMainWindow):
             return
         if state == 'recording':
             elapsed = now - self._manual_record_started_at
+            formatted_elapsed = self._format_recording_elapsed(elapsed)
             self.record_btn.setText(
-                f'■  {self._format_recording_elapsed(elapsed)}')
+                f'■  {formatted_elapsed}')
+            if hasattr(self, 'remote_api') and self.remote_api is not None:
+                self.remote_api.notify_recording_tick(elapsed, formatted_elapsed)
             recording = self._manual_record_path
             try:
                 if not native_recording and elapsed > 0.75:
@@ -5842,6 +5866,8 @@ class MainWindow(QMainWindow):
             'Stop and finalize the current manual recording')
         self.record_btn.setStyleSheet(self._manual_record_button_qss(True))
         self._set_status('RECORDING', status_active_qss())
+        if hasattr(self, 'remote_api') and self.remote_api is not None:
+            self.remote_api.notify_recording_started(str(self._manual_record_path or ''))
 
     def _restore_clip_capture_profile(self):
         geometry_restart = bool(
@@ -5928,6 +5954,8 @@ class MainWindow(QMainWindow):
             self._set_status('RECORDING SAVED', status_active_qss())
             QTimer.singleShot(2500, self._update_status)
             self.capture_card.show_recording_saved(recording.name)
+        if hasattr(self, 'remote_api') and self.remote_api is not None:
+            self.remote_api.notify_recording_stopped(str(recording.name if recording else ''))
         self._restore_clip_capture_profile()
 
     def _fail_manual_recording(
@@ -5942,6 +5970,8 @@ class MainWindow(QMainWindow):
         self._manual_record_path = None
         self._pending_manual_record_path = None
         self._manual_record_finalize_thread = None
+        if hasattr(self, 'remote_api') and self.remote_api is not None:
+            self.remote_api.notify_recording_stopped(str(recording.name if recording else ''))
         if recording is not None and not keep_recording:
             try:
                 recording.unlink(missing_ok=True)
@@ -6082,6 +6112,8 @@ class MainWindow(QMainWindow):
             return
 
         print(f"Saving clip: {output_path.name}  ({duration_seconds}s)")
+        if hasattr(self, 'remote_api') and self.remote_api is not None:
+            self.remote_api.notify_clip_save_started(duration_seconds)
         self._save_diagnostic_started_at = time.monotonic()
         emit_event(
             'clip_save', 'save_requested', state='REQUESTED',
@@ -6124,6 +6156,8 @@ class MainWindow(QMainWindow):
             self._pump_save_responses()
 
             if not self.bridge.save_clip(str(output_path), duration_seconds):
+                if hasattr(self, 'remote_api') and self.remote_api is not None:
+                    self.remote_api.notify_clip_save_failed('Capture engine did not accept save command')
                 emit_event(
                     'clip_save', 'command_rejected', state='FAILED',
                     error=DiagnosticError.CLIP_SAVE_FAILED,
@@ -6350,6 +6384,8 @@ class MainWindow(QMainWindow):
                   f'timeout warning was premature')
 
         print(f'Base clip committed: {output_path.name}')
+        if hasattr(self, 'remote_api') and self.remote_api is not None:
+            self.remote_api.notify_clip_saved(str(output_path), duration_seconds)
         # Pick the post-processing route. Exactly one runs — see
         # select_post_route() for why that exclusivity is load-bearing.
         active_config = self._capture_config.active
@@ -7813,6 +7849,12 @@ class MainWindow(QMainWindow):
             self._capture_health_snapshot = self._capture_health.observe(
                 connected=False, frame_count=0, engine_flags=0)
             self._set_status('DISCONNECTED', status_warning_qss())
+            if hasattr(self, 'remote_api') and self.remote_api is not None:
+                self.remote_api.update_state({
+                    'engine_connected': False,
+                    'can_clip': False,
+                    'can_record': False,
+                })
             return
 
         # Second driver of the same single reader. The fast save timer stops as
@@ -7822,6 +7864,16 @@ class MainWindow(QMainWindow):
         # still exactly one consumer.
         self._pump_save_responses()
         codec = self.bridge.get_active_codec()
+        if hasattr(self, 'remote_api') and self.remote_api is not None:
+            active_title = getattr(self._active_game_window, 'title', '') if getattr(self, '_active_game_window', None) else ''
+            self.remote_api.update_state({
+                'engine_connected': True,
+                'can_clip': True,
+                'can_record': getattr(self, '_manual_record_state', 'idle') == 'idle',
+                'active_codec': str(codec or ''),
+                'clip_buffer_seconds': int(getattr(self, 'clip_duration', 30)),
+                'active_game': str(active_title),
+            })
         if codec:
             if encoder_preset_supported(sys.platform, 'nvenc') \
                     and 'nvenc' in codec.lower():
@@ -8436,6 +8488,9 @@ class MainWindow(QMainWindow):
             partial_worker.join(timeout=0.5)
         self.upload_manager.stop()
         self._shutdown_mark('UploadsStopped')
+        if hasattr(self, 'remote_api') and self.remote_api is not None:
+            self.remote_api.stop()
+            self._shutdown_mark('RemoteApiStopped')
         if hasattr(self, 'clip_grid'):
             self.clip_grid.shutdown()
             self._shutdown_mark('LibraryStopped')
@@ -8754,6 +8809,19 @@ class _SettingsPage(QWidget):
         self.sm.save_settings()
         self.error_notifications_changed.emit(enabled)
 
+    def _on_remote_api_toggled(self, enabled: bool) -> None:
+        if self.sm is None:
+            return
+        enabled = bool(enabled)
+        self.sm.set('remote_api_enabled', enabled)
+        self.sm.save_settings()
+        parent_win = self.window()
+        if hasattr(parent_win, 'remote_api') and parent_win.remote_api is not None:
+            if enabled:
+                parent_win.remote_api.start()
+            else:
+                parent_win.remote_api.stop()
+
     def __init__(self, settings_manager: SettingsManager = None, parent=None,
                  keyboard_capture: ThirdPartyKeyboardCapture | None = None):
         super().__init__(parent)
@@ -8964,6 +9032,19 @@ class _SettingsPage(QWidget):
         self.close_to_tray_check.toggled.connect(
             self._on_close_to_tray_toggled)
         layout.addWidget(self.close_to_tray_check)
+        layout.addSpacing(6)
+
+        self.remote_api_check = QCheckBox(
+            'Enable Stream Deck & Local API (Port 19840)')
+        set_theme_style(self.remote_api_check, checkbox_qss)
+        self.remote_api_check.setChecked(
+            bool(self.sm.get('remote_api_enabled', True)))
+        self.remote_api_check.setToolTip(
+            'Exposes a local WebSocket and REST API on 127.0.0.1:19840 '
+            'for Elgato Stream Deck plugins, macro decks, and overlays.')
+        self.remote_api_check.toggled.connect(
+            self._on_remote_api_toggled)
+        layout.addWidget(self.remote_api_check)
         layout.addSpacing(6)
 
         # Notifications --
