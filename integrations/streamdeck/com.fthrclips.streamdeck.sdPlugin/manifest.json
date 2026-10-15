@@ -1,10 +1,19 @@
 {
-  "Author": "Victor7996 & FTHR Community",
-  "Description": "Control FTHR Clips, save instant replay clips, toggle manual recording with live timers, and monitor capture status directly on your Stream Deck.",
+  "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
+  "UUID": "com.fthrclips.streamdeck",
   "Name": "FTHR Clips",
+  "Version": "1.0.0.0",
+  "Author": "Victor7996 & FTHR Community",
+  "Description": "Control FTHR Clips, save replay clips, toggle manual recording with live timers, and monitor capture status.",
   "Icon": "assets/icon",
   "URL": "https://github.com/FTHR-Community/FTHR-Clips",
-  "Version": "1.0.0",
+  "Category": "FTHR Clips",
+  "CategoryIcon": "assets/icon",
+  "CodePath": "bin/plugin.js",
+  "SDKVersion": 2,
+  "Software": {
+    "MinimumVersion": "6.5"
+  },
   "OS": [
     {
       "Platform": "windows",
@@ -12,29 +21,28 @@
     },
     {
       "Platform": "mac",
-      "MinimumVersion": "10.14"
+      "MinimumVersion": "10.15"
     }
   ],
-  "SDKVersion": 2,
-  "Software": {
-    "MinimumVersion": "6.0"
+  "Nodejs": {
+    "Version": "20"
   },
-  "CodePath": "index.html",
-  "Category": "FTHR Clips",
-  "CategoryIcon": "assets/icon",
   "Actions": [
     {
       "Icon": "assets/clip",
       "Name": "Save Clip",
       "Tooltip": "Save the current replay buffer clip",
       "UUID": "com.fthrclips.streamdeck.clip",
+      "Controllers": [
+        "Keypad"
+      ],
       "States": [
         {
           "Image": "assets/clip",
           "Title": "CLIP",
           "TitleColor": "#ffffff",
           "TitleAlignment": "bottom",
-          "FontSize": "11"
+          "FontSize": 11
         }
       ]
     },
@@ -43,20 +51,23 @@
       "Name": "Toggle Recording",
       "Tooltip": "Start or stop manual recording with live elapsed timer",
       "UUID": "com.fthrclips.streamdeck.record",
+      "Controllers": [
+        "Keypad"
+      ],
       "States": [
         {
           "Image": "assets/record_idle",
           "Title": "RECORD",
           "TitleColor": "#a0a0a0",
           "TitleAlignment": "bottom",
-          "FontSize": "10"
+          "FontSize": 10
         },
         {
           "Image": "assets/record_active",
           "Title": "REC\n00:00",
           "TitleColor": "#ff4444",
           "TitleAlignment": "bottom",
-          "FontSize": "10"
+          "FontSize": 10
         }
       ]
     },
@@ -65,13 +76,16 @@
       "Name": "Screenshot",
       "Tooltip": "Take and save a screenshot of the current game or desktop",
       "UUID": "com.fthrclips.streamdeck.screenshot",
+      "Controllers": [
+        "Keypad"
+      ],
       "States": [
         {
           "Image": "assets/screenshot",
           "Title": "SCREENSHOT",
           "TitleColor": "#ffffff",
           "TitleAlignment": "bottom",
-          "FontSize": "9"
+          "FontSize": 9
         }
       ]
     },
@@ -80,13 +94,16 @@
       "Name": "Engine Status",
       "Tooltip": "Displays active game, capture health, and buffer length",
       "UUID": "com.fthrclips.streamdeck.status",
+      "Controllers": [
+        "Keypad"
+      ],
       "States": [
         {
           "Image": "assets/status",
           "Title": "OFFLINE",
           "TitleColor": "#888888",
           "TitleAlignment": "bottom",
-          "FontSize": "9"
+          "FontSize": 9
         }
       ]
     }
