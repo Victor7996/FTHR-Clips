@@ -7,9 +7,15 @@ This document contains everything needed to publish the **FTHR Clips Stream Deck
 ## 1. Package File & Asset Locations
 
 - **Plugin Binary (`.streamDeckPlugin`)**:  
-  `H:\desktop\fthr-clips\FTHR-Clips\integrations\streamdeck\com.fthrclips.streamdeck.streamDeckPlugin`
-- **Product Icon (512x512 PNG)**:  
-  `H:\desktop\fthr-clips\FTHR-Clips\integrations\streamdeck\marketplace_icon.png`
+  `H:\desktop\fthr-clips\fthr-clips-streamdeck\com.fthrclips.streamdeck.streamDeckPlugin`
+- **App Icon (288x288 PNG - 1:1)**:  
+  `H:\desktop\fthr-clips\fthr-clips-streamdeck\assets\store\app_icon_288.png`
+- **Thumbnail (1920x960 PNG - 2:1)**:  
+  `H:\desktop\fthr-clips\fthr-clips-streamdeck\assets\store\thumbnail_1920x960.png`
+- **Gallery Images (Minimum 3 required - 1920x960 / 1920x1080 PNG)**:  
+  1. `H:\desktop\fthr-clips\fthr-clips-streamdeck\assets\store\gallery_1_overview_1920x960.png` (or `gallery_1_overview_1920x1080.png`)
+  2. `H:\desktop\fthr-clips\fthr-clips-streamdeck\assets\store\gallery_2_recording_1920x960.png` (or `gallery_2_recording_1920x1080.png`)
+  3. `H:\desktop\fthr-clips\fthr-clips-streamdeck\assets\store\gallery_3_features_1920x960.png` (or `gallery_3_features_1920x1080.png`)
 
 ---
 
