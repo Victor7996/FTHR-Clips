@@ -18,11 +18,11 @@ This document contains everything needed to publish the **FTHR Clips Stream Deck
 ### Product Details
 - **Product Name**: `FTHR Clips`
 - **Subtitle / Short Description**:  
-  `Control FTHR Clips directly from Stream Deck. Save replay clips, toggle recording with live timers, and monitor capture health.`
+  `Control FTHR Clips v2.0 directly from Stream Deck. Save replay clips, toggle recording, mute mic, and manage game detection. Support on Ko-fi: https://ko-fi.com/victor7996`
 - **Category**: `Gaming` (or `Video`)
 - **Tags**: `fthr`, `clips`, `replay`, `recording`, `gaming`, `capture`, `stream`
 - **Website / Support URL**:  
-  `https://github.com/FTHR-Community/FTHR-Clips`
+  `https://ko-fi.com/victor7996`
 
 ---
 
@@ -31,14 +31,16 @@ This document contains everything needed to publish the **FTHR Clips Stream Deck
 ```markdown
 # FTHR Clips for Stream Deck
 
-Take full tactile control over **FTHR Clips** directly from your Elgato Stream Deck. Save instant replay buffer clips, start and stop manual recording with live timers, take screenshots, and view capture engine status in real time.
+Take full tactile control over **FTHR Clips** directly from your Elgato Stream Deck. Save instant replay buffer clips, start and stop manual recording with live timers, accept foreground game switches, mute your microphone, and monitor capture engine status in real time.
 
 ---
 
 ### Key Features
 
-- **⚡ Instant Replay Clips**: Save highlights from your rolling replay buffer with dynamic duration feedback (`CLIP 30s`, `CLIP 3m`, etc.). Shows instant visual confirmation when saving is completed (`SAVING…` ➔ `SAVED!`).
+- **⚡ Instant Replay Clips**: Save highlights from your rolling replay buffer with dynamic duration feedback (`CLIP 30s`, `CLIP 60s`, etc.) that automatically reflects your active FTHR Clips settings. Shows instant visual confirmation when saving is completed (`SAVING…` ➔ `SAVED!`).
 - **🔴 Manual Recording with Live Timers**: Start and stop recordings on the fly. The button dynamically transitions to an active red recording state displaying a live elapsed timer (`REC 01:23`).
+- **🎙️ Microphone Mute Toggle**: Instantly mute and unmute your microphone with live visual state indicators (`MIC LIVE` ➔ `MIC MUTED`).
+- **🎮 Game Detection Accept & Dismiss**: Prompted foreground game detection right on your keys — accept capture switching to a newly detected game with one tap or dismiss it.
 - **📸 Screenshot Capture**: Take clean desktop and game screenshots with a single tap.
 - **🛡️ Real-Time Engine Status**: Displays your current capture status, active game title, and capture engine health directly on your Stream Deck canvas.
 
@@ -47,13 +49,20 @@ Take full tactile control over **FTHR Clips** directly from your Elgato Stream D
 ### Prerequisites
 
 1. **FTHR Clips** (Windows or Linux) installed and running.
-2. Remote API enabled in FTHR Clips (*Settings ➔ Remote API*, enabled by default on port `19840`).
+2. Stream Deck & Remote API enabled in FTHR Clips (*Settings ➔ General ➔ System*, enabled by default on port `19840`).
+
+---
+
+### Support the Project
+
+If you love FTHR Clips and this Stream Deck plugin, consider supporting development on **Ko-fi**:
+☕ [https://ko-fi.com/victor7996](https://ko-fi.com/victor7996)
 
 ---
 
 ### Open Source
 
-FTHR Clips is an open-source, hardware-accelerated clipping and recording software designed for gamers and content creators. Visit our [GitHub Repository](https://github.com/FTHR-Community/FTHR-Clips) for documentation, source code, and community support.
+FTHR Clips is an open-source, hardware-accelerated clipping and recording software designed for gamers and content creators. Visit our [GitHub Repository](https://github.com/Victor7996/fthr-clips-streamdeck) for documentation, source code, and community support.
 ```
 
 ---

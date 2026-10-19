@@ -1,6 +1,12 @@
 # FTHR Clips - Elgato Stream Deck Plugin & Local API Integration (v2.0)
 
+[![Support on Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20the%20Project-FF5E5B?style=for-the-badge&logo=kofi&logoColor=white)](https://ko-fi.com/victor7996)
+[![Elgato SDK](https://img.shields.io/badge/Elgato%20SDK-v3-blue?style=for-the-badge)](https://maker.elgato.com)
+[![Stream Deck](https://img.shields.io/badge/Stream%20Deck-6.9%2B-green?style=for-the-badge)](https://www.elgato.com/stream-deck)
+
 Official Elgato Stream Deck integration for **FTHR Clips v2.0**. Control replay clip saving, manual recording with live timers, game detection prompts, microphone muting, and engine status directly from your Stream Deck keys.
+
+☕ **Support development on Ko-fi:** [https://ko-fi.com/victor7996](https://ko-fi.com/victor7996)
 
 ---
 
