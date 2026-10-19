@@ -28,8 +28,6 @@ const activeActions = {
     mic: new Set()
 };
 
-// Map context -> action settings (e.g., duration_seconds)
-const actionSettings = new Map();
 
 // FTHR Clips state snapshot
 let fthrWs = null;
@@ -112,21 +110,10 @@ function handleStreamDeckMessage(msg) {
     const context = msg.context;
 
     if (event === 'willAppear') {
-        if (msg.payload && msg.payload.settings) {
-            actionSettings.set(context, msg.payload.settings);
-        }
         registerActionContext(action, context);
         syncActionUI(context, action);
     } else if (event === 'willDisappear') {
         unregisterActionContext(action, context);
-        actionSettings.delete(context);
-    } else if (event === 'didReceiveSettings' || event === 'sendToPlugin') {
-        if (msg.payload && (msg.payload.settings || msg.payload.duration_seconds !== undefined)) {
-            const current = actionSettings.get(context) || {};
-            const updated = Object.assign({}, current, msg.payload.settings || msg.payload);
-            actionSettings.set(context, updated);
-            syncActionUI(context, action);
-        }
     } else if (event === 'keyDown') {
         handleButtonPress(action, context);
     }
@@ -165,9 +152,7 @@ function handleButtonPress(action, context) {
     }
 
     if (action.endsWith('.clip')) {
-        const settings = actionSettings.get(context) || {};
-        const customDuration = parseInt(settings.duration_seconds || 0, 10);
-        sendFthrCommand('save_clip', { duration_seconds: customDuration });
+        sendFthrCommand('save_clip');
         sendToStreamDeck({
             event: 'setTitle',
             context: context,
@@ -226,9 +211,7 @@ function syncActionUI(context, action) {
             sendToStreamDeck({ event: 'setState', context: context, payload: { state: 0 } });
             sendToStreamDeck({ event: 'setTitle', context: context, payload: { title: 'FTHR\nOFFLINE', target: 0 } });
         } else if (action.endsWith('.clip')) {
-            const settings = actionSettings.get(context) || {};
-            const sec = parseInt(settings.duration_seconds || 0, 10) || fthrState.clip_buffer_seconds || 30;
-            sendToStreamDeck({ event: 'setTitle', context: context, payload: { title: `CLIP\n${formatDurationLabel(sec)}`, target: 0 } });
+            sendToStreamDeck({ event: 'setTitle', context: context, payload: { title: 'CLIP\nOFFLINE', target: 0 } });
         } else if (action.endsWith('.status')) {
             sendToStreamDeck({ event: 'setTitle', context: context, payload: { title: 'OFFLINE', target: 0 } });
         } else if (action.endsWith('.game_confirm')) {
@@ -255,9 +238,7 @@ function syncActionUI(context, action) {
             sendToStreamDeck({ event: 'setTitle', context: context, payload: { title: 'RECORD', target: 0 } });
         }
     } else if (action.endsWith('.clip')) {
-        const settings = actionSettings.get(context) || {};
-        const customSec = parseInt(settings.duration_seconds || 0, 10);
-        const sec = customSec > 0 ? customSec : (fthrState.clip_buffer_seconds || 30);
+        const sec = fthrState.clip_buffer_seconds || 30;
         sendToStreamDeck({
             event: 'setTitle',
             context: context,

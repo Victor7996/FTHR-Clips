@@ -28,9 +28,8 @@
     {
       "Icon": "assets/clip",
       "Name": "Save Clip",
-      "Tooltip": "Save the current replay buffer clip (supports custom durations in v2.0)",
+      "Tooltip": "Save the current replay buffer clip using your configured FTHR Clips settings",
       "UUID": "com.fthrclips.streamdeck.clip",
-      "PropertyInspectorPath": "pi/clip.html",
       "Controllers": [
         "Keypad"
       ],
