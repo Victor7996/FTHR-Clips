@@ -108,7 +108,7 @@
       "Icon": "assets/game_confirm",
       "Name": "Accept Game Detection",
       "Tooltip": "Accept switching capture to the detected game window (FTHR v2.0)",
-      "UUID": "com.fthrclips.streamdeck.game_confirm",
+      "UUID": "com.fthrclips.streamdeck.game-confirm",
       "Controllers": [
         "Keypad"
       ],
@@ -126,7 +126,7 @@
       "Icon": "assets/game_dismiss",
       "Name": "Dismiss Game Detection",
       "Tooltip": "Dismiss the detected game alert (FTHR v2.0)",
-      "UUID": "com.fthrclips.streamdeck.game_dismiss",
+      "UUID": "com.fthrclips.streamdeck.game-dismiss",
       "Controllers": [
         "Keypad"
       ],

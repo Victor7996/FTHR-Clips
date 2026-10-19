@@ -125,8 +125,8 @@ function registerActionContext(action, context) {
     else if (action.endsWith('.record')) activeActions.record.add(context);
     else if (action.endsWith('.screenshot')) activeActions.screenshot.add(context);
     else if (action.endsWith('.status')) activeActions.status.add(context);
-    else if (action.endsWith('.game_confirm')) activeActions.game_confirm.add(context);
-    else if (action.endsWith('.game_dismiss')) activeActions.game_dismiss.add(context);
+    else if (action.endsWith('.game-confirm') || action.endsWith('.game_confirm')) activeActions.game_confirm.add(context);
+    else if (action.endsWith('.game-dismiss') || action.endsWith('.game_dismiss')) activeActions.game_dismiss.add(context);
     else if (action.endsWith('.mic')) activeActions.mic.add(context);
 }
 
@@ -136,8 +136,8 @@ function unregisterActionContext(action, context) {
     else if (action.endsWith('.record')) activeActions.record.delete(context);
     else if (action.endsWith('.screenshot')) activeActions.screenshot.delete(context);
     else if (action.endsWith('.status')) activeActions.status.delete(context);
-    else if (action.endsWith('.game_confirm')) activeActions.game_confirm.delete(context);
-    else if (action.endsWith('.game_dismiss')) activeActions.game_dismiss.delete(context);
+    else if (action.endsWith('.game-confirm') || action.endsWith('.game_confirm')) activeActions.game_confirm.delete(context);
+    else if (action.endsWith('.game-dismiss') || action.endsWith('.game_dismiss')) activeActions.game_dismiss.delete(context);
     else if (action.endsWith('.mic')) activeActions.mic.delete(context);
 }
 
@@ -168,10 +168,10 @@ function handleButtonPress(action, context) {
         });
     } else if (action.endsWith('.status')) {
         sendFthrCommand('get_status');
-    } else if (action.endsWith('.game_confirm')) {
+    } else if (action.endsWith('.game-confirm') || action.endsWith('.game_confirm')) {
         sendFthrCommand('confirm_game_detection');
         sendToStreamDeck({ event: 'showOk', context: context });
-    } else if (action.endsWith('.game_dismiss')) {
+    } else if (action.endsWith('.game-dismiss') || action.endsWith('.game_dismiss')) {
         sendFthrCommand('dismiss_game_detection');
         sendToStreamDeck({ event: 'showOk', context: context });
     } else if (action.endsWith('.mic')) {
@@ -198,8 +198,8 @@ function syncAllActions() {
     activeActions.clip.forEach(ctx => syncActionUI(ctx, 'com.fthrclips.streamdeck.clip'));
     activeActions.record.forEach(ctx => syncActionUI(ctx, 'com.fthrclips.streamdeck.record'));
     activeActions.status.forEach(ctx => syncActionUI(ctx, 'com.fthrclips.streamdeck.status'));
-    activeActions.game_confirm.forEach(ctx => syncActionUI(ctx, 'com.fthrclips.streamdeck.game_confirm'));
-    activeActions.game_dismiss.forEach(ctx => syncActionUI(ctx, 'com.fthrclips.streamdeck.game_dismiss'));
+    activeActions.game_confirm.forEach(ctx => syncActionUI(ctx, 'com.fthrclips.streamdeck.game-confirm'));
+    activeActions.game_dismiss.forEach(ctx => syncActionUI(ctx, 'com.fthrclips.streamdeck.game-dismiss'));
     activeActions.mic.forEach(ctx => syncActionUI(ctx, 'com.fthrclips.streamdeck.mic'));
 }
 
@@ -214,9 +214,9 @@ function syncActionUI(context, action) {
             sendToStreamDeck({ event: 'setTitle', context: context, payload: { title: 'CLIP\nOFFLINE', target: 0 } });
         } else if (action.endsWith('.status')) {
             sendToStreamDeck({ event: 'setTitle', context: context, payload: { title: 'OFFLINE', target: 0 } });
-        } else if (action.endsWith('.game_confirm')) {
+        } else if (action.endsWith('.game-confirm') || action.endsWith('.game_confirm')) {
             sendToStreamDeck({ event: 'setTitle', context: context, payload: { title: 'ACCEPT\nOFFLINE', target: 0 } });
-        } else if (action.endsWith('.game_dismiss')) {
+        } else if (action.endsWith('.game-dismiss') || action.endsWith('.game_dismiss')) {
             sendToStreamDeck({ event: 'setTitle', context: context, payload: { title: 'DISMISS\nOFFLINE', target: 0 } });
         } else if (action.endsWith('.mic')) {
             sendToStreamDeck({ event: 'setState', context: context, payload: { state: 0 } });
@@ -256,14 +256,14 @@ function syncActionUI(context, action) {
             context: context,
             payload: { title: title, target: 0 }
         });
-    } else if (action.endsWith('.game_confirm')) {
+    } else if (action.endsWith('.game-confirm') || action.endsWith('.game_confirm')) {
         const game = fthrState.pending_game ? fthrState.pending_game.slice(0, 7) : 'READY';
         sendToStreamDeck({
             event: 'setTitle',
             context: context,
             payload: { title: `ACCEPT\n${game}`, target: 0 }
         });
-    } else if (action.endsWith('.game_dismiss')) {
+    } else if (action.endsWith('.game-dismiss') || action.endsWith('.game_dismiss')) {
         const game = fthrState.pending_game ? fthrState.pending_game.slice(0, 7) : 'IDLE';
         sendToStreamDeck({
             event: 'setTitle',
