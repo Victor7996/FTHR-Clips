@@ -160,6 +160,7 @@ a = Analysis(
         'core.instance_activation',
         'core.mic_recorder',
         'core.presets_manager',
+        'core.remote_api',
         'core.settings_manager',
         'core.theme_manager',
         'core.upload_manager',
