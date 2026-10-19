@@ -86,6 +86,7 @@
         </div>
     </div>
 
+    <script src="../bin/settings.js"></script>
     <script>
         let websocket = null;
         let uuid = null;
@@ -128,7 +129,10 @@
             const customRow = document.getElementById('customRow');
             const customInput = document.getElementById('customInput');
 
-            const standard = ['0', '15', '30', '45', '60', '120', '300', '600', '900', '1800'];
+            const standard = (window.FTHR_SETTINGS && window.FTHR_SETTINGS.CLIPS.STANDARD_DURATIONS)
+                ? window.FTHR_SETTINGS.CLIPS.STANDARD_DURATIONS.map(String)
+                : ['0', '15', '30', '45', '60', '120', '300', '600', '900', '1800'];
+
             if (standard.includes(String(sec))) {
                 select.value = String(sec);
                 customRow.style.display = 'none';
@@ -143,7 +147,13 @@
         }
 
         function saveSettings(durationSec) {
-            settings.duration_seconds = parseInt(durationSec, 10) || 0;
+            const maxDuration = (window.FTHR_SETTINGS && window.FTHR_SETTINGS.CLIPS.MAX_CUSTOM_DURATION_SECONDS) || 1800;
+            let val = parseInt(durationSec, 10) || 0;
+            if (val > maxDuration) val = maxDuration;
+            settings.duration_seconds = val;
+
+            const actionUUID = (window.FTHR_SETTINGS && window.FTHR_SETTINGS.ACTIONS.CLIP) || 'com.fthrclips.streamdeck.clip';
+
             if (websocket && websocket.readyState === 1) {
                 websocket.send(JSON.stringify({
                     event: 'setSettings',
@@ -152,7 +162,7 @@
                 }));
                 websocket.send(JSON.stringify({
                     event: 'sendToPlugin',
-                    action: actionInfo ? actionInfo.action : 'com.fthrclips.streamdeck.clip',
+                    action: actionInfo ? actionInfo.action : actionUUID,
                     context: uuid,
                     payload: settings
                 }));

@@ -3173,10 +3173,10 @@ class MainWindow(QMainWindow):
         # refresh_settings() without needing a direct signal connection.
         self.settings_manager._upload_manager_ref = self.upload_manager
 
-        from core.remote_api import RemoteApiController
+        from core.remote_api import DEFAULT_HOST, DEFAULT_PORT, RemoteApiController
         self.remote_api = RemoteApiController(
-            host=str(self.settings_manager.get('remote_api_host', '127.0.0.1')),
-            port=int(self.settings_manager.get('remote_api_port', 19840)),
+            host=str(self.settings_manager.get('remote_api_host', DEFAULT_HOST)),
+            port=int(self.settings_manager.get('remote_api_port', DEFAULT_PORT)),
             parent=self,
         )
         self.remote_api.request_save_clip.connect(self._on_remote_api_save_clip)
@@ -9035,6 +9035,7 @@ class _SettingsPage(QWidget):
 
     def _make_general_page(self):
         from ui.upload_settings_widget import UploadSettingsWidget
+        from core.remote_api import DEFAULT_HOST, DEFAULT_PORT
 
         page = QWidget()
         page.setStyleSheet('background: transparent;')
@@ -9076,7 +9077,7 @@ class _SettingsPage(QWidget):
         self.remote_api_check.setChecked(
             bool(self.sm.get('remote_api_enabled', True)))
         self.remote_api_check.setToolTip(
-            'Exposes a local WebSocket and REST API on 127.0.0.1:19840 '
+            f'Exposes a local WebSocket and REST API on {DEFAULT_HOST}:{DEFAULT_PORT} '
             'for Elgato Stream Deck plugins, macro decks, and overlays.')
         self.remote_api_check.toggled.connect(
             self._on_remote_api_toggled)

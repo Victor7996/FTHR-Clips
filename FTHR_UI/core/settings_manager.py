@@ -187,6 +187,8 @@ class SettingsManager:
             # selected image is stored here so the preview remains portable
             # and can be reset to the standard background at any time.
             'input_overlay_preview_background': '',
+            'remote_api_enabled': True,
+            'remote_api_port': 19840,
         }
         
         if not self.config_file.exists():
