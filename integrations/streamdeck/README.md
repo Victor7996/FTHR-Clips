@@ -6,25 +6,25 @@
 
 Official Elgato Stream Deck integration for **FTHR Clips v2.0**. Control replay clip saving, manual recording with live timers, game detection prompts, microphone muting, and engine status directly from your Stream Deck keys.
 
-☕ **Support development on Ko-fi:** [https://ko-fi.com/victor7996](https://ko-fi.com/victor7996)
+**Support development on Ko-fi:** [https://ko-fi.com/victor7996](https://ko-fi.com/victor7996)
 
 ---
 
 ## 1. Features in v2.0
 
-* **⚡ Save Replay Clip:**
+* **Save Replay Clip:**
   * Save a highlight from your rolling replay buffer with a single press, using the settings configured in FTHR Clips.
   * Dynamically displays the app's active clip buffer duration in real time (e.g., `CLIP 30s` or `CLIP 60s`).
   * **Partial Replay Save Feedback:** When a clip is saved, the button displays the exact saved duration (`SAVED! 15s`).
-* **🔴 Toggle Manual Recording:**
+* **Toggle Manual Recording:**
   * Start and stop manual recording on the fly. The button dynamically transitions to an active red recording state displaying a live elapsed timer (`REC 01:23`).
-* **🎙️ Microphone Mute Toggle (New in v2.0):**
+* **Microphone Mute Toggle (New in v2.0):**
   * Mute and unmute microphone recording with live visual feedback (`MIC LIVE` in cyan, `MIC MUTED` in amber).
-* **🎮 Game Detection Accept & Dismiss (New in v2.0):**
+* **Game Detection Accept & Dismiss (New in v2.0):**
   * When FTHR Clips prompts for a newly detected foreground game, accept capture switching or dismiss the alert with one tap without alt-tabbing.
-* **📸 Screenshot Capture:**
+* **Screenshot Capture:**
   * Instantly take and save a screenshot of the active game or desktop with visual confirmation.
-* **🛡️ Real-Time Engine Status:**
+* **Real-Time Engine Status:**
   * Monitors capture status, active game title, and engine health in real time.
 
 ---

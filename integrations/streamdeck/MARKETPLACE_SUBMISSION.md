@@ -37,26 +37,26 @@ Take full tactile control over **FTHR Clips** directly from your Elgato Stream D
 
 ### Key Features
 
-- **⚡ Instant Replay Clips**: Save highlights from your rolling replay buffer with dynamic duration feedback (`CLIP 30s`, `CLIP 60s`, etc.) that automatically reflects your active FTHR Clips settings. Shows instant visual confirmation when saving is completed (`SAVING…` ➔ `SAVED!`).
-- **🔴 Manual Recording with Live Timers**: Start and stop recordings on the fly. The button dynamically transitions to an active red recording state displaying a live elapsed timer (`REC 01:23`).
-- **🎙️ Microphone Mute Toggle**: Instantly mute and unmute your microphone with live visual state indicators (`MIC LIVE` ➔ `MIC MUTED`).
-- **🎮 Game Detection Accept & Dismiss**: Prompted foreground game detection right on your keys — accept capture switching to a newly detected game with one tap or dismiss it.
-- **📸 Screenshot Capture**: Take clean desktop and game screenshots with a single tap.
-- **🛡️ Real-Time Engine Status**: Displays your current capture status, active game title, and capture engine health directly on your Stream Deck canvas.
+- **Instant Replay Clips**: Save highlights from your rolling replay buffer with dynamic duration feedback (`CLIP 30s`, `CLIP 60s`, etc.) that automatically reflects your active FTHR Clips settings. Shows instant visual confirmation when saving is completed (`SAVING...` -> `SAVED!`).
+- **Manual Recording with Live Timers**: Start and stop recordings on the fly. The button dynamically transitions to an active red recording state displaying a live elapsed timer (`REC 01:23`).
+- **Microphone Mute Toggle**: Instantly mute and unmute your microphone with live visual state indicators (`MIC LIVE` -> `MIC MUTED`).
+- **Game Detection Accept & Dismiss**: Prompted foreground game detection right on your keys — accept capture switching to a newly detected game with one tap or dismiss it.
+- **Screenshot Capture**: Take clean desktop and game screenshots with a single tap.
+- **Real-Time Engine Status**: Displays your current capture status, active game title, and capture engine health directly on your Stream Deck canvas.
 
 ---
 
 ### Prerequisites
 
 1. **FTHR Clips** (Windows or Linux) installed and running.
-2. Stream Deck & Remote API enabled in FTHR Clips (*Settings ➔ General ➔ System*, enabled by default on port `19840`).
+2. Stream Deck & Remote API enabled in FTHR Clips (*Settings -> General -> System*, enabled by default on port `19840`).
 
 ---
 
 ### Support the Project
 
 If you love FTHR Clips and this Stream Deck plugin, consider supporting development on **Ko-fi**:
-☕ [https://ko-fi.com/victor7996](https://ko-fi.com/victor7996)
+[https://ko-fi.com/victor7996](https://ko-fi.com/victor7996)
 
 ---
 
@@ -83,11 +83,11 @@ Initial release of the official FTHR Clips Stream Deck integration:
 ## 3. How to Submit on Maker Console
 
 1. Navigate to [https://maker.elgato.com](https://maker.elgato.com) and log in with your Elgato account.
-2. Click **Create Product** ➔ Select **Plugin**.
+2. Click **Create Product** -> Select **Plugin**.
 3. Drag and drop the packaged file:  
    `com.fthrclips.streamdeck.streamDeckPlugin`
 4. Upload the icon:  
    `marketplace_icon.png`
 5. Paste the product description, subtitle, and release notes from section 2 above.
 6. Select the category (**Gaming** / **Video**).
-7. Click **Submit for Review**. Elgato's review team typically approves submissions within 2–5 business days.
+7. Click **Submit for Review**. Elgato's review team typically approves submissions within 2-5 business days.
