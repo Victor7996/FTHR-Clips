@@ -2,9 +2,9 @@
   "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
   "UUID": "com.fthrclips.streamdeck",
   "Name": "FTHR Clips",
-  "Version": "1.0.0.0",
+  "Version": "2.0.0.0",
   "Author": "Victor7996 & FTHR Community",
-  "Description": "Control FTHR Clips, save replay clips, toggle manual recording with live timers, and monitor capture status.",
+  "Description": "Control FTHR Clips v2.0, save custom replay clips, toggle manual recording with live timers, accept game detection, and monitor capture status.",
   "Icon": "assets/icon",
   "URL": "https://github.com/FTHR-Community/FTHR-Clips",
   "Category": "FTHR Clips",
@@ -28,8 +28,9 @@
     {
       "Icon": "assets/clip",
       "Name": "Save Clip",
-      "Tooltip": "Save the current replay buffer clip",
+      "Tooltip": "Save the current replay buffer clip (supports custom durations in v2.0)",
       "UUID": "com.fthrclips.streamdeck.clip",
+      "PropertyInspectorPath": "pi/clip.html",
       "Controllers": [
         "Keypad"
       ],
@@ -99,6 +100,67 @@
           "Image": "assets/status",
           "Title": "OFFLINE",
           "TitleColor": "#888888",
+          "TitleAlignment": "bottom",
+          "FontSize": 9
+        }
+      ]
+    },
+    {
+      "Icon": "assets/game_confirm",
+      "Name": "Accept Game Detection",
+      "Tooltip": "Accept switching capture to the detected game window (FTHR v2.0)",
+      "UUID": "com.fthrclips.streamdeck.game_confirm",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "assets/game_confirm",
+          "Title": "ACCEPT\nGAME",
+          "TitleColor": "#10b981",
+          "TitleAlignment": "bottom",
+          "FontSize": 9
+        }
+      ]
+    },
+    {
+      "Icon": "assets/game_dismiss",
+      "Name": "Dismiss Game Detection",
+      "Tooltip": "Dismiss the detected game alert (FTHR v2.0)",
+      "UUID": "com.fthrclips.streamdeck.game_dismiss",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "assets/game_dismiss",
+          "Title": "DISMISS\nGAME",
+          "TitleColor": "#ef4444",
+          "TitleAlignment": "bottom",
+          "FontSize": 9
+        }
+      ]
+    },
+    {
+      "Icon": "assets/mic_live",
+      "Name": "Toggle Microphone",
+      "Tooltip": "Mute or unmute microphone recording (FTHR v2.0)",
+      "UUID": "com.fthrclips.streamdeck.mic",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "assets/mic_live",
+          "Title": "MIC\nLIVE",
+          "TitleColor": "#38bdf8",
+          "TitleAlignment": "bottom",
+          "FontSize": 9
+        },
+        {
+          "Image": "assets/mic_muted",
+          "Title": "MIC\nMUTED",
+          "TitleColor": "#f59e0b",
           "TitleAlignment": "bottom",
           "FontSize": 9
         }

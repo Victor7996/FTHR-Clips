@@ -29,7 +29,7 @@ from urllib.parse import parse_qs, urlparse
 from PySide6.QtCore import QObject, Signal, Slot
 
 
-API_VERSION = '1.0.0'
+API_VERSION = '2.0.0'
 DEFAULT_PORT = 19840
 DEFAULT_HOST = '127.0.0.1'
 WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
@@ -128,6 +128,9 @@ class RemoteApiController(QObject):
     request_start_recording = Signal()
     request_stop_recording = Signal()
     request_screenshot = Signal()
+    request_confirm_game_detection = Signal()
+    request_dismiss_game_detection = Signal()
+    request_toggle_mic = Signal()
 
     def __init__(self, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT, parent: QObject | None = None):
         super().__init__(parent)
@@ -147,9 +150,11 @@ class RemoteApiController(QObject):
             'can_clip': True,
             'can_record': True,
             'active_game': '',
+            'pending_game': '',
             'active_codec': '',
             'fps': 60,
             'resolution': '',
+            'mic_muted': False,
             'last_saved_clip': '',
         }
 
@@ -250,6 +255,21 @@ class RemoteApiController(QObject):
             'elapsed_seconds': elapsed_seconds,
             'formatted': formatted,
         })
+
+    def notify_game_detected(self, game_title: str) -> None:
+        with self._state_lock:
+            self._state['pending_game'] = game_title
+        self.broadcast_event('game_detected', {'game': game_title})
+
+    def notify_game_cleared(self) -> None:
+        with self._state_lock:
+            self._state['pending_game'] = ''
+        self.broadcast_event('game_cleared', {})
+
+    def notify_mic_toggled(self, is_muted: bool) -> None:
+        with self._state_lock:
+            self._state['mic_muted'] = bool(is_muted)
+        self.broadcast_event('mic_toggled', {'muted': bool(is_muted)})
 
     # Rate limiting guard
 
@@ -505,16 +525,17 @@ class RemoteApiController(QObject):
                     'message': 'Please wait before saving another clip.',
                 })
                 return
-            duration = int(body_json.get('duration_seconds', 0))
+            duration = int(body_json.get('duration_seconds') or body_json.get('duration') or 0)
             self.request_save_clip.emit(duration)
             self.notify_clip_save_started(duration)
             self._send_http_response(client, 200, {
                 'ok': True,
                 'action': 'save_clip',
+                'duration_seconds': duration,
                 'message': 'Clip save requested.',
             })
 
-        elif method == 'POST' and path == '/api/v1/actions/record/toggle':
+        elif method == 'POST' and path in ('/api/v1/actions/record/toggle', '/api/v1/actions/record_toggle'):
             self.request_toggle_recording.emit()
             self._send_http_response(client, 200, {
                 'ok': True,
@@ -540,6 +561,27 @@ class RemoteApiController(QObject):
             self._send_http_response(client, 200, {
                 'ok': True,
                 'action': 'screenshot',
+            })
+
+        elif method == 'POST' and path in ('/api/v1/actions/game/confirm', '/api/v1/actions/confirm_game'):
+            self.request_confirm_game_detection.emit()
+            self._send_http_response(client, 200, {
+                'ok': True,
+                'action': 'confirm_game_detection',
+            })
+
+        elif method == 'POST' and path in ('/api/v1/actions/game/dismiss', '/api/v1/actions/dismiss_game'):
+            self.request_dismiss_game_detection.emit()
+            self._send_http_response(client, 200, {
+                'ok': True,
+                'action': 'dismiss_game_detection',
+            })
+
+        elif method == 'POST' and path in ('/api/v1/actions/mic/toggle', '/api/v1/actions/toggle_mic'):
+            self.request_toggle_mic.emit()
+            self._send_http_response(client, 200, {
+                'ok': True,
+                'action': 'toggle_mic',
             })
 
         else:
@@ -615,6 +657,7 @@ class RemoteApiController(QObject):
             return
 
         action = str(msg.get('action') or msg.get('command') or '').lower()
+        duration_val = msg.get('duration_seconds') or msg.get('duration') or 0
         if action == 'save_clip':
             if not self._check_rate_limit('save_clip'):
                 resp = WebSocketFrameParser.encode_text_frame(json.dumps({
@@ -626,7 +669,7 @@ class RemoteApiController(QObject):
                 except OSError:
                     self._remove_client(client)
                 return
-            duration = int(msg.get('duration_seconds', 0))
+            duration = int(duration_val)
             self.request_save_clip.emit(duration)
             self.notify_clip_save_started(duration)
         elif action in ('toggle_recording', 'toggle_record'):
@@ -637,5 +680,11 @@ class RemoteApiController(QObject):
             self.request_stop_recording.emit()
         elif action in ('screenshot', 'save_screenshot'):
             self.request_screenshot.emit()
+        elif action in ('confirm_game_detection', 'confirm_game', 'accept_game'):
+            self.request_confirm_game_detection.emit()
+        elif action in ('dismiss_game_detection', 'dismiss_game'):
+            self.request_dismiss_game_detection.emit()
+        elif action in ('toggle_mic', 'mute_mic', 'mic_toggle'):
+            self.request_toggle_mic.emit()
         elif action in ('status', 'get_status'):
             self._push_initial_state_to_client(client)

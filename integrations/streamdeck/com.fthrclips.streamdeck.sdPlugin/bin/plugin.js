@@ -1,8 +1,14 @@
 /**
- * FTHR Clips - Elgato Stream Deck Official Integration Plugin
+ * FTHR Clips - Elgato Stream Deck Official Integration Plugin (v2.0)
  * 
  * Runs in Stream Deck's internal runtime via index.html (or standalone Node.js).
  * Communicates with FTHR Clips Local API on ws://127.0.0.1:19840/api/v1/ws.
+ * 
+ * v2.0 Additions:
+ * - Custom per-action clip durations (15s, 30s, 60s, 2m, 5m, custom) with Property Inspector support.
+ * - Partial replay save actual duration reporting (SAVED! Xs).
+ * - Game detection Accept/Dismiss actions for automatic foreground game detection.
+ * - Microphone mute/unmute status tracking and controls.
  */
 
 // Connection parameters
@@ -16,10 +22,16 @@ const activeActions = {
     clip: new Set(),
     record: new Set(),
     screenshot: new Set(),
-    status: new Set()
+    status: new Set(),
+    game_confirm: new Set(),
+    game_dismiss: new Set(),
+    mic: new Set()
 };
 
-// FTHR Clips state
+// Map context -> action settings (e.g., duration_seconds)
+const actionSettings = new Map();
+
+// FTHR Clips state snapshot
 let fthrWs = null;
 let fthrConnected = false;
 let fthrState = {
@@ -27,6 +39,8 @@ let fthrState = {
     recording_elapsed_formatted: '00:00:00',
     clip_buffer_seconds: 30,
     active_game: '',
+    pending_game: '',
+    mic_muted: false,
     state: 'idle'
 };
 
@@ -98,19 +112,46 @@ function handleStreamDeckMessage(msg) {
     const context = msg.context;
 
     if (event === 'willAppear') {
-        if (action && action.endsWith('.clip')) activeActions.clip.add(context);
-        else if (action && action.endsWith('.record')) activeActions.record.add(context);
-        else if (action && action.endsWith('.screenshot')) activeActions.screenshot.add(context);
-        else if (action && action.endsWith('.status')) activeActions.status.add(context);
+        if (msg.payload && msg.payload.settings) {
+            actionSettings.set(context, msg.payload.settings);
+        }
+        registerActionContext(action, context);
         syncActionUI(context, action);
     } else if (event === 'willDisappear') {
-        if (action && action.endsWith('.clip')) activeActions.clip.delete(context);
-        else if (action && action.endsWith('.record')) activeActions.record.delete(context);
-        else if (action && action.endsWith('.screenshot')) activeActions.screenshot.delete(context);
-        else if (action && action.endsWith('.status')) activeActions.status.delete(context);
+        unregisterActionContext(action, context);
+        actionSettings.delete(context);
+    } else if (event === 'didReceiveSettings' || event === 'sendToPlugin') {
+        if (msg.payload && (msg.payload.settings || msg.payload.duration_seconds !== undefined)) {
+            const current = actionSettings.get(context) || {};
+            const updated = Object.assign({}, current, msg.payload.settings || msg.payload);
+            actionSettings.set(context, updated);
+            syncActionUI(context, action);
+        }
     } else if (event === 'keyDown') {
         handleButtonPress(action, context);
     }
+}
+
+function registerActionContext(action, context) {
+    if (!action) return;
+    if (action.endsWith('.clip')) activeActions.clip.add(context);
+    else if (action.endsWith('.record')) activeActions.record.add(context);
+    else if (action.endsWith('.screenshot')) activeActions.screenshot.add(context);
+    else if (action.endsWith('.status')) activeActions.status.add(context);
+    else if (action.endsWith('.game_confirm')) activeActions.game_confirm.add(context);
+    else if (action.endsWith('.game_dismiss')) activeActions.game_dismiss.add(context);
+    else if (action.endsWith('.mic')) activeActions.mic.add(context);
+}
+
+function unregisterActionContext(action, context) {
+    if (!action) return;
+    if (action.endsWith('.clip')) activeActions.clip.delete(context);
+    else if (action.endsWith('.record')) activeActions.record.delete(context);
+    else if (action.endsWith('.screenshot')) activeActions.screenshot.delete(context);
+    else if (action.endsWith('.status')) activeActions.status.delete(context);
+    else if (action.endsWith('.game_confirm')) activeActions.game_confirm.delete(context);
+    else if (action.endsWith('.game_dismiss')) activeActions.game_dismiss.delete(context);
+    else if (action.endsWith('.mic')) activeActions.mic.delete(context);
 }
 
 function handleButtonPress(action, context) {
@@ -124,7 +165,9 @@ function handleButtonPress(action, context) {
     }
 
     if (action.endsWith('.clip')) {
-        sendFthrCommand('save_clip');
+        const settings = actionSettings.get(context) || {};
+        const customDuration = parseInt(settings.duration_seconds || 0, 10);
+        sendFthrCommand('save_clip', { duration_seconds: customDuration });
         sendToStreamDeck({
             event: 'setTitle',
             context: context,
@@ -140,6 +183,14 @@ function handleButtonPress(action, context) {
         });
     } else if (action.endsWith('.status')) {
         sendFthrCommand('get_status');
+    } else if (action.endsWith('.game_confirm')) {
+        sendFthrCommand('confirm_game_detection');
+        sendToStreamDeck({ event: 'showOk', context: context });
+    } else if (action.endsWith('.game_dismiss')) {
+        sendFthrCommand('dismiss_game_detection');
+        sendToStreamDeck({ event: 'showOk', context: context });
+    } else if (action.endsWith('.mic')) {
+        sendFthrCommand('toggle_mic');
     }
 }
 
@@ -162,6 +213,9 @@ function syncAllActions() {
     activeActions.clip.forEach(ctx => syncActionUI(ctx, 'com.fthrclips.streamdeck.clip'));
     activeActions.record.forEach(ctx => syncActionUI(ctx, 'com.fthrclips.streamdeck.record'));
     activeActions.status.forEach(ctx => syncActionUI(ctx, 'com.fthrclips.streamdeck.status'));
+    activeActions.game_confirm.forEach(ctx => syncActionUI(ctx, 'com.fthrclips.streamdeck.game_confirm'));
+    activeActions.game_dismiss.forEach(ctx => syncActionUI(ctx, 'com.fthrclips.streamdeck.game_dismiss'));
+    activeActions.mic.forEach(ctx => syncActionUI(ctx, 'com.fthrclips.streamdeck.mic'));
 }
 
 function syncActionUI(context, action) {
@@ -169,71 +223,80 @@ function syncActionUI(context, action) {
 
     if (!fthrConnected) {
         if (action.endsWith('.record')) {
-            sendToStreamDeck({
-                event: 'setState',
-                context: context,
-                payload: { state: 0 }
-            });
-            sendToStreamDeck({
-                event: 'setTitle',
-                context: context,
-                payload: { title: 'FTHR\nOFFLINE', target: 0 }
-            });
+            sendToStreamDeck({ event: 'setState', context: context, payload: { state: 0 } });
+            sendToStreamDeck({ event: 'setTitle', context: context, payload: { title: 'FTHR\nOFFLINE', target: 0 } });
         } else if (action.endsWith('.clip')) {
-            const sec = fthrState.clip_buffer_seconds || 30;
-            sendToStreamDeck({
-                event: 'setTitle',
-                context: context,
-                payload: { title: `CLIP\n${formatDurationLabel(sec)}`, target: 0 }
-            });
+            const settings = actionSettings.get(context) || {};
+            const sec = parseInt(settings.duration_seconds || 0, 10) || fthrState.clip_buffer_seconds || 30;
+            sendToStreamDeck({ event: 'setTitle', context: context, payload: { title: `CLIP\n${formatDurationLabel(sec)}`, target: 0 } });
         } else if (action.endsWith('.status')) {
-            sendToStreamDeck({
-                event: 'setTitle',
-                context: context,
-                payload: { title: 'OFFLINE', target: 0 }
-            });
+            sendToStreamDeck({ event: 'setTitle', context: context, payload: { title: 'OFFLINE', target: 0 } });
+        } else if (action.endsWith('.game_confirm')) {
+            sendToStreamDeck({ event: 'setTitle', context: context, payload: { title: 'ACCEPT\nOFFLINE', target: 0 } });
+        } else if (action.endsWith('.game_dismiss')) {
+            sendToStreamDeck({ event: 'setTitle', context: context, payload: { title: 'DISMISS\nOFFLINE', target: 0 } });
+        } else if (action.endsWith('.mic')) {
+            sendToStreamDeck({ event: 'setState', context: context, payload: { state: 0 } });
+            sendToStreamDeck({ event: 'setTitle', context: context, payload: { title: 'MIC\nOFFLINE', target: 0 } });
         }
         return;
     }
 
     if (action.endsWith('.record')) {
         if (fthrState.is_recording) {
-            sendToStreamDeck({
-                event: 'setState',
-                context: context,
-                payload: { state: 1 }
-            });
+            sendToStreamDeck({ event: 'setState', context: context, payload: { state: 1 } });
             sendToStreamDeck({
                 event: 'setTitle',
                 context: context,
                 payload: { title: `REC\n${fthrState.recording_elapsed_formatted.slice(3)}`, target: 0 }
             });
         } else {
-            sendToStreamDeck({
-                event: 'setState',
-                context: context,
-                payload: { state: 0 }
-            });
-            sendToStreamDeck({
-                event: 'setTitle',
-                context: context,
-                payload: { title: 'RECORD', target: 0 }
-            });
+            sendToStreamDeck({ event: 'setState', context: context, payload: { state: 0 } });
+            sendToStreamDeck({ event: 'setTitle', context: context, payload: { title: 'RECORD', target: 0 } });
         }
     } else if (action.endsWith('.clip')) {
-        const sec = fthrState.clip_buffer_seconds || 30;
+        const settings = actionSettings.get(context) || {};
+        const customSec = parseInt(settings.duration_seconds || 0, 10);
+        const sec = customSec > 0 ? customSec : (fthrState.clip_buffer_seconds || 30);
         sendToStreamDeck({
             event: 'setTitle',
             context: context,
             payload: { title: `CLIP\n${formatDurationLabel(sec)}`, target: 0 }
         });
     } else if (action.endsWith('.status')) {
-        const title = fthrState.active_game ? fthrState.active_game.slice(0, 10) : 'CAPTURE\nREADY';
+        let title = 'CAPTURE\nREADY';
+        if (fthrState.pending_game) {
+            title = `DETECTED\n${fthrState.pending_game.slice(0, 8)}`;
+        } else if (fthrState.active_game) {
+            title = fthrState.active_game.slice(0, 10);
+        }
         sendToStreamDeck({
             event: 'setTitle',
             context: context,
             payload: { title: title, target: 0 }
         });
+    } else if (action.endsWith('.game_confirm')) {
+        const game = fthrState.pending_game ? fthrState.pending_game.slice(0, 7) : 'READY';
+        sendToStreamDeck({
+            event: 'setTitle',
+            context: context,
+            payload: { title: `ACCEPT\n${game}`, target: 0 }
+        });
+    } else if (action.endsWith('.game_dismiss')) {
+        const game = fthrState.pending_game ? fthrState.pending_game.slice(0, 7) : 'IDLE';
+        sendToStreamDeck({
+            event: 'setTitle',
+            context: context,
+            payload: { title: `DISMISS\n${game}`, target: 0 }
+        });
+    } else if (action.endsWith('.mic')) {
+        if (fthrState.mic_muted) {
+            sendToStreamDeck({ event: 'setState', context: context, payload: { state: 1 } });
+            sendToStreamDeck({ event: 'setTitle', context: context, payload: { title: 'MIC\nMUTED', target: 0 } });
+        } else {
+            sendToStreamDeck({ event: 'setState', context: context, payload: { state: 0 } });
+            sendToStreamDeck({ event: 'setTitle', context: context, payload: { title: 'MIC\nLIVE', target: 0 } });
+        }
     }
 }
 
@@ -243,7 +306,7 @@ function connectToFTHR() {
         fthrWs = new WSClass('ws://127.0.0.1:19840/api/v1/ws');
 
         fthrWs.onopen = () => {
-            console.log('[FTHR StreamDeck] Connected to FTHR Clips Local API');
+            console.log('[FTHR StreamDeck] Connected to FTHR Clips Local API v2.0');
             fthrConnected = true;
             syncAllActions();
         };
@@ -307,17 +370,20 @@ function handleFthrEvent(msg) {
             });
         });
     } else if (event === 'clip_saved') {
+        // v2.0: Show actual saved duration (supporting partial replay saves)
+        const savedDuration = data.duration ? `${data.duration}s` : 'SAVED!';
+        const feedbackTitle = data.duration ? `SAVED!\n${savedDuration}` : 'SAVED!';
         activeActions.clip.forEach(ctx => {
             sendToStreamDeck({ event: 'showOk', context: ctx });
             sendToStreamDeck({
                 event: 'setTitle',
                 context: ctx,
-                payload: { title: 'SAVED!', target: 0 }
+                payload: { title: feedbackTitle, target: 0 }
             });
         });
         setTimeout(() => {
             activeActions.clip.forEach(ctx => syncActionUI(ctx, 'com.fthrclips.streamdeck.clip'));
-        }, 2000);
+        }, 2500);
     } else if (event === 'clip_save_failed') {
         activeActions.clip.forEach(ctx => {
             sendToStreamDeck({ event: 'showAlert', context: ctx });
@@ -330,14 +396,38 @@ function handleFthrEvent(msg) {
         setTimeout(() => {
             activeActions.clip.forEach(ctx => syncActionUI(ctx, 'com.fthrclips.streamdeck.clip'));
         }, 2500);
+    } else if (event === 'game_detected') {
+        fthrState.pending_game = data.game || '';
+        activeActions.game_confirm.forEach(ctx => syncActionUI(ctx, 'com.fthrclips.streamdeck.game_confirm'));
+        activeActions.game_dismiss.forEach(ctx => syncActionUI(ctx, 'com.fthrclips.streamdeck.game_dismiss'));
+        activeActions.status.forEach(ctx => syncActionUI(ctx, 'com.fthrclips.streamdeck.status'));
+    } else if (event === 'game_cleared') {
+        fthrState.pending_game = '';
+        activeActions.game_confirm.forEach(ctx => syncActionUI(ctx, 'com.fthrclips.streamdeck.game_confirm'));
+        activeActions.game_dismiss.forEach(ctx => syncActionUI(ctx, 'com.fthrclips.streamdeck.game_dismiss'));
+        activeActions.status.forEach(ctx => syncActionUI(ctx, 'com.fthrclips.streamdeck.status'));
+    } else if (event === 'mic_toggled') {
+        fthrState.mic_muted = Boolean(data.muted);
+        activeActions.mic.forEach(ctx => syncActionUI(ctx, 'com.fthrclips.streamdeck.mic'));
     }
 }
 
-function sendFthrCommand(actionName) {
+function sendFthrCommand(actionName, data) {
+    const payload = Object.assign({ action: actionName }, data || {});
     if (fthrWs && fthrWs.readyState === 1) {
-        fthrWs.send(JSON.stringify({ action: actionName }));
+        fthrWs.send(JSON.stringify(payload));
     } else {
-        sendPostAction(`/api/v1/actions/${actionName === 'save_clip' ? 'save_clip' : 'record/toggle'}`, {});
+        const endpointMap = {
+            'save_clip': '/api/v1/actions/save_clip',
+            'toggle_record': '/api/v1/actions/record/toggle',
+            'screenshot': '/api/v1/actions/screenshot',
+            'confirm_game_detection': '/api/v1/actions/game/confirm',
+            'dismiss_game_detection': '/api/v1/actions/game/dismiss',
+            'toggle_mic': '/api/v1/actions/mic/toggle',
+            'get_status': '/api/v1/status'
+        };
+        const endpoint = endpointMap[actionName] || `/api/v1/actions/${actionName}`;
+        sendPostAction(endpoint, payload);
     }
 }
 

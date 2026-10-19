@@ -44,7 +44,7 @@ def test_status_endpoint(api_server):
     with urllib.request.urlopen(req) as resp:
         assert resp.status == 200
         data = json.loads(resp.read().decode('utf-8'))
-        assert data['api_version'] == '1.0.0'
+        assert data['api_version'] == '2.0.0'
         assert data['state'] == 'idle'
         assert data['can_clip'] is True
         assert data['can_record'] is True
@@ -268,4 +268,47 @@ def test_websocket_ping_pong(api_server):
     assert payload == ping_payload
 
     sock.close()
+
+
+def test_v2_game_detection_and_mic_actions(api_server, qt_app):
+    results = {}
+    api_server.request_confirm_game_detection.connect(lambda: results.setdefault('confirm', True))
+    api_server.request_dismiss_game_detection.connect(lambda: results.setdefault('dismiss', True))
+    api_server.request_toggle_mic.connect(lambda: results.setdefault('mic_toggle', True))
+
+    # Test REST endpoints
+    for endpoint, key in [
+        ('/api/v1/actions/game/confirm', 'confirm'),
+        ('/api/v1/actions/game/dismiss', 'dismiss'),
+        ('/api/v1/actions/mic/toggle', 'mic_toggle')
+    ]:
+        url = f'http://127.0.0.1:{api_server.port}{endpoint}'
+        req = urllib.request.Request(url, data=b'{}', headers={'Content-Type': 'application/json'}, method='POST')
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 200
+
+    for _ in range(10):
+        qt_app.processEvents()
+        if len(results) == 3:
+            break
+        time.sleep(0.02)
+
+    assert results.get('confirm') is True
+    assert results.get('dismiss') is True
+    assert results.get('mic_toggle') is True
+
+
+def test_v2_notifications_and_state(api_server):
+    api_server.notify_game_detected('Counter-Strike 2')
+    state = api_server.get_state()
+    assert state['pending_game'] == 'Counter-Strike 2'
+
+    api_server.notify_game_cleared()
+    state = api_server.get_state()
+    assert state['pending_game'] == ''
+
+    api_server.notify_mic_toggled(True)
+    state = api_server.get_state()
+    assert state['mic_muted'] is True
+
 

@@ -3184,6 +3184,9 @@ class MainWindow(QMainWindow):
         self.remote_api.request_start_recording.connect(self._on_hotkey_start_recording)
         self.remote_api.request_stop_recording.connect(self._on_hotkey_stop_recording)
         self.remote_api.request_screenshot.connect(self._on_hotkey_save_screenshot)
+        self.remote_api.request_confirm_game_detection.connect(self._on_confirm_game_detection)
+        self.remote_api.request_dismiss_game_detection.connect(self._on_dismiss_game_detection)
+        self.remote_api.request_toggle_mic.connect(self._toggle_mic_mute)
 
         if bool(self.settings_manager.get('remote_api_enabled', True)):
             self.remote_api.start()
@@ -4278,6 +4281,23 @@ class MainWindow(QMainWindow):
         else:
             self._on_hotkey_save_clip()
 
+    def _toggle_mic_mute(self):
+        self._mic_muted = not getattr(self, '_mic_muted', False)
+        if MicRecorder.is_available():
+            recorder = MicRecorder()
+            if self._mic_muted:
+                recorder.set_gain(0.0)
+            else:
+                vol = float(self.settings_manager.get('mic_volume', 100)) / 100.0
+                recorder.set_gain(vol)
+        if hasattr(self, 'remote_api') and self.remote_api is not None:
+            self.remote_api.notify_mic_toggled(self._mic_muted)
+        status_text = 'Microphone Muted' if self._mic_muted else 'Microphone Unmuted'
+        print(f'[RemoteAPI] {status_text}')
+        if hasattr(self, 'capture_card'):
+            self.capture_card.show_prompt(status_text)
+
+
 
     def _on_hotkey_start_recording(self):
         if self._manual_record_state == 'idle':
@@ -4719,6 +4739,8 @@ class MainWindow(QMainWindow):
             f'{game_name} detected — [{hotkey}] Record  [{dismiss}] Dismiss')
         self._game_dismiss_timer.stop()
         self._game_dismiss_timer.start(15000)
+        if hasattr(self, 'remote_api') and self.remote_api is not None:
+            self.remote_api.notify_game_detected(game_name)
 
     def _on_game_closed(self, hwnd: int):
         if hwnd == self._active_game_hwnd:
@@ -4760,16 +4782,22 @@ class MainWindow(QMainWindow):
             return
         self._pending_game_window = None
         self._game_dismiss_timer.stop()
+        if hasattr(self, 'remote_api') and self.remote_api is not None:
+            self.remote_api.notify_game_cleared()
         self._switch_capture_to_game(window)
 
     def _on_dismiss_game_detection(self):
         self._suppress_game_candidate(self._pending_game_window)
         self._pending_game_window = None
         self._game_dismiss_timer.stop()
+        if hasattr(self, 'remote_api') and self.remote_api is not None:
+            self.remote_api.notify_game_cleared()
 
     def _on_game_prompt_timeout(self):
         self._suppress_game_candidate(self._pending_game_window)
         self._pending_game_window = None
+        if hasattr(self, 'remote_api') and self.remote_api is not None:
+            self.remote_api.notify_game_cleared()
 
     def _on_game_lost(self):
         if not bool(self.settings_manager.get(
