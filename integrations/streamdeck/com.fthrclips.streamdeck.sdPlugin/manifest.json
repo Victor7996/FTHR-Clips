@@ -10,9 +10,9 @@
   "Category": "FTHR Clips",
   "CategoryIcon": "assets/icon",
   "CodePath": "index.html",
-  "SDKVersion": 2,
+  "SDKVersion": 3,
   "Software": {
-    "MinimumVersion": "6.5"
+    "MinimumVersion": "6.9"
   },
   "OS": [
     {
